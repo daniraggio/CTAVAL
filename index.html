@@ -434,50 +434,58 @@ function xlDateToStr(serial) {
 function parseSheet(wb, name) {
   const ws = wb.Sheets[name];
   if (!ws) return null;
-  // Get raw array-of-arrays (no header auto-detection)
-  // cellDates:true in XLSX.read means dates come as JS Date objects
   const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
-  // Data rows start at index 3 (rows 0-2 are title/headers/blank)
+
+  // Extract numeric value from a cell — handles formula objects {f, v}, strings, numbers
+  function cellNum(v) {
+    if (v == null) return null;
+    if (typeof v === 'object' && !(v instanceof Date)) v = v.v;
+    if (v == null) return null;
+    const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',','.'));
+    return isNaN(n) ? null : n;
+  }
+
+  // Extract date string using local components (timezone-safe)
+  function cellDate(v) {
+    if (v == null) return null;
+    if (typeof v === 'object' && !(v instanceof Date)) v = v.v;
+    if (v instanceof Date) return dateParts(v);
+    if (typeof v === 'number') return xlDateToStr(v);
+    const s = String(v).trim();
+    if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0,10);
+    const d = new Date(s);
+    return isNaN(d) ? null : dateParts(d);
+  }
+
   const rows = [];
   for (let ri = 3; ri < aoa.length; ri++) {
     const row = aoa[ri];
     if (!row || row.length < 2) continue;
-    const fechaRaw = row[0];
-    if (fechaRaw == null) continue;
-    // Parse date: could be Excel serial or already a date string
-    let fecha;
-    if (typeof fechaRaw === 'number') {
-      fecha = xlDateToStr(fechaRaw);
-    } else if (fechaRaw instanceof Date) {
-      fecha = dateParts(fechaRaw); // timezone-safe local components
-    } else {
-      // Try string parse - if it looks like YYYY-MM-DD already, use directly
-      const s = String(fechaRaw).trim();
-      if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
-        fecha = s.slice(0,10);
-      } else {
-        const d = new Date(fechaRaw);
-        if (!isNaN(d)) fecha = dateParts(d);
-      }
-    }
+    const fecha = cellDate(row[0]);
     if (!fecha || !fecha.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
-    // avg is last column (index 26 = col 27)
-    const avg = parseFloat(row[26]) || 0;
-    // hourly values: indices 2..25 (columns 3..26)
+
+    // Read 24 hourly values (cols 2–25)
     const h = [];
-    let hasH = false;
+    let hSum = 0, hCount = 0;
     for (let hi = 0; hi < 24; hi++) {
-      const v = row[2 + hi];
-      const fv = (v != null && v !== '') ? parseFloat(v) : null;
-      h.push(isNaN(fv) ? null : fv);
-      if (fv != null && !isNaN(fv)) hasH = true;
+      const v = cellNum(row[2 + hi]);
+      h.push(v);
+      if (v != null) { hSum += v; hCount++; }
     }
-    const r = {fecha, avg: isNaN(avg) ? 0 : avg};
+
+    // avg = AVERAGE(non-null hours) — matches Excel =AVERAGE(C:Z) which ignores blanks
+    // This works for both ENERGIA (all 24 populated) and CVP (sparse hours, same price)
+    const avg = hCount > 0 ? hSum / hCount : 0;
+    const hasH = hCount > 0;
+
+    const r = {fecha, avg: Math.round(avg * 1e6) / 1e6};
     if (hasH) r.h = h;
     rows.push(r);
   }
+
   if (rows.length === 0) {
-    console.warn('parseSheet: 0 rows parsed for', name, '— first 4 raw rows:', aoa.slice(0,4));
+    console.warn('parseSheet: 0 rows for', name,
+      '— row[3] sample:', JSON.stringify(aoa[3]?.slice(0,4)));
   }
   return {rows};
 }
