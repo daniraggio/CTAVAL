@@ -486,7 +486,7 @@ async function fetchXLS(filename) {
 function fileToMonthKey(filename) {
   const m = filename.match(/AVAL_(\d{4})_(\d{2})\.xls$/i);
   if (!m) return null;
-  return {year: m[1], mm: m[2], key: `${MONTH_NAME[m[2]]}${m[1]}`};
+  return {year: m[1], mm: m[2], key: `${m[1]}_${m[2]}`};
 }
 
 async function loadAllData() {
@@ -557,10 +557,11 @@ async function loadAllData() {
     const eRows = ALL_DATA[key]['AVALTG23-ENERGIA']?.rows || [];
     const daysActual = eRows.length || DAYS_IN[mm] || 30;
 
-    const monthLabel = `${MONTH_NAME[mm]} ${year}`;
+    const monthLabel = `${MONTH_NAME[mm] || mm} ${year}`;
     MONTH_META_DYN[key] = {
       label: monthLabel,
-      badge: `${monthLabel} · ${daysActual} días`
+      badge: `${monthLabel} · ${daysActual} días`,
+      sortKey: `${year}-${mm}`
     };
     // Default TC and KP — user can override in config
     MONTH_CFG_DYN[key] = {TC: 1200, KP: 0.9};
@@ -640,8 +641,8 @@ function switchMonth(){
 }
 
 // ── DATA ACCESS ────────────────────────────────────────────────────────────
-const D=ALL_DATA; // ALL_DATA populated by loader
-const getRows=k=>D[MONTH]?.[k]?.rows||[];
+// getRows reads ALL_DATA at call time (populated after load)
+const getRows=k=>ALL_DATA[MONTH]?.[k]?.rows||[];
 function allDates(keys){return[...new Set(keys.flatMap(k=>getRows(k).map(r=>r.fecha)))].sort();}
 
 // DD-MM format
@@ -1402,10 +1403,24 @@ function initDashboard(loadedData) {
   Object.assign(ALL_DATA, loadedData.ALL_DATA);
   Object.assign(MONTH_META, loadedData.MONTH_META_DYN);
   Object.assign(MONTH_CFG, loadedData.MONTH_CFG_DYN);
+  // Apply known TC defaults (user can override in config)
+  const TC_DEFAULTS = {
+    '2026_03': 1450, '2026_04': 1381.0954, '2026_05': 1400
+  };
+  Object.keys(MONTH_CFG).forEach(k => {
+    const tcDefault = TC_DEFAULTS[k];
+    if (tcDefault) MONTH_CFG[k].TC = tcDefault;
+  });
 
   // Populate month selector
   const sel = document.getElementById('monthSel');
-  const keys = Object.keys(MONTH_META).sort(); // chronological if named MMMYYYY
+  // Sort by actual date: each key has a dateSort stored by loader, or derive from label
+  const keys = Object.keys(MONTH_META).sort((a,b) => {
+    // MONTH_META entries have .sortKey = 'YYYY-MM' added by loader
+    const sa = MONTH_META[a].sortKey || a;
+    const sb = MONTH_META[b].sortKey || b;
+    return sa.localeCompare(sb);
+  });
   sel.innerHTML = '';
   keys.forEach((k, i) => {
     const opt = document.createElement('option');
