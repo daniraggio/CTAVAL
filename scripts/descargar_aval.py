@@ -2,7 +2,8 @@
 descargar_aval.py
 -----------------
 Descarga la planilla XLS mensual de la Central Térmica Alto Valle
-desde orazul.cilary.com y la guarda en /data/ del repo.
+desde orazul.cilary.com. Los dropdowns usan Bootstrap Selectpicker
+(el <select> nativo está oculto), por eso se interactúa via JS + click.
 
 Ruta en el repo: scripts/descargar_aval.py
 """
@@ -12,12 +13,16 @@ from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-# ── Configuración ──────────────────────────────────────────────────────────────
-BASE_URL    = "http://orazul.cilary.com/"
-BUSQUEDA    = "aval"
-MAQUINA     = "AVAL - CTALVALG - c.termica alto valle"
-OUTPUT_DIR  = Path(__file__).resolve().parent.parent / "data"
-# ───────────────────────────────────────────────────────────────────────────────
+BASE_URL   = "http://orazul.cilary.com/"
+BUSQUEDA   = "aval"
+MAQUINA    = "AVAL - CTALVALG - c.termica alto valle"
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data"
+
+MESES_ES = {
+    1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril",
+    5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto",
+    9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"
+}
 
 
 def nombre_archivo():
@@ -25,13 +30,20 @@ def nombre_archivo():
     return f"AVAL_{now.year}_{now.month:02d}.xls"
 
 
-def mes_en_español():
-    meses = {
-        1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-        5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-        9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
-    }
-    return meses[datetime.now().month]
+def selectpicker_elegir(page, select_id, valor):
+    """
+    Selecciona una opción en un Bootstrap Selectpicker.
+    Estrategia: forzar el valor via JS y luego disparar 'change'.
+    """
+    page.evaluate(f"""
+        var sel = document.getElementById('{select_id}');
+        sel.value = '{valor}';
+        sel.dispatchEvent(new Event('change', {{ bubbles: true }}));
+        if (typeof $(sel).selectpicker !== 'undefined') {{
+            $(sel).selectpicker('refresh');
+        }}
+    """)
+    page.wait_for_timeout(800)
 
 
 def descargar_planilla():
@@ -46,47 +58,48 @@ def descargar_planilla():
         context = browser.new_context(accept_downloads=True)
         page    = context.new_page()
 
-        # 1. Abrir sitio y hacer click en "Posoperativo"
+        # 1. Abrir sitio
         print("  → Abriendo sitio...")
         page.goto(BASE_URL, timeout=30_000)
         page.wait_for_load_state("networkidle")
+
+        # 2. Click en tab "Posoperativo"
+        print("  → Navegando a Posoperativo...")
         page.get_by_text("Posoperativo", exact=True).click()
         page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(1_000)
 
-        # 2. Seleccionar Año en el primer dropdown
+        # 3. Seleccionar Año via JS (Bootstrap Selectpicker)
         print(f"  → Seleccionando año {now.year}...")
-        page.locator("select").nth(0).select_option(str(now.year))
-        page.wait_for_timeout(500)
+        selectpicker_elegir(page, "anio", str(now.year))
 
-        # 3. Seleccionar Mes en el segundo dropdown
-        mes = mes_en_español()
-        print(f"  → Seleccionando mes {mes}...")
-        page.locator("select").nth(1).select_option(label=mes)
-        page.wait_for_timeout(500)
+        # 4. Seleccionar Mes via JS
+        mes_num = str(now.month)
+        print(f"  → Seleccionando mes {MESES_ES[now.month]} ({mes_num})...")
+        selectpicker_elegir(page, "mes", mes_num)
 
-        # 4. Escribir "aval" en el campo de búsqueda
-        print(f"  → Buscando '{BUSQUEDA}'...")
+        # 5. Escribir "aval" en el buscador de máquinas
+        print(f"  → Buscando máquina '{BUSQUEDA}'...")
         page.locator("input[type='text']").first.fill(BUSQUEDA)
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(1_000)
 
-        # 5. Seleccionar "AVAL - CTALVALG - c.termica alto valle" de la lista
-        print(f"  → Seleccionando máquina...")
+        # 6. Seleccionar "AVAL - CTALVALG - c.termica alto valle"
+        print("  → Seleccionando AVAL - CTALVALG - c.termica alto valle...")
         page.get_by_text(MAQUINA, exact=False).first.click()
         page.wait_for_timeout(500)
 
-        # 6. Click en "Generar"
+        # 7. Click en "Generar"
         print("  → Generando archivo...")
         page.get_by_role("button", name="Generar").click()
-        page.wait_for_timeout(3_000)  # esperar que aparezca el link
+        page.wait_for_timeout(4_000)
 
-        # 7. Descargar el archivo XLS generado
-        print("  → Descargando...")
+        # 8. Descargar el .xls que aparece como link
+        print("  → Descargando .xls...")
         with page.expect_download(timeout=30_000) as dl_info:
-            page.locator(f"a[href*='.xls']").first.click()
+            page.locator("a[href*='.xls']").first.click()
 
-        download  = dl_info.value
-        tmp_path  = download.path()
-        shutil.copy(tmp_path, destino)
+        download = dl_info.value
+        shutil.copy(download.path(), destino)
 
         print(f"  ✅ Guardado: {destino}")
         browser.close()
