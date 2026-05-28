@@ -365,8 +365,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
     <div class="cfg-grid" id="cfg-per-month-grid">
       <!-- filled dynamically per month -->
     </div>
-    <div style="padding:4px 0 20px">
+    <div style="padding:4px 0 20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
       <button id="cfgApplyBtn" onclick="saveConfig()" style="background:rgba(79,142,247,.2);color:var(--accent);border:1px solid rgba(79,142,247,.4);border-radius:8px;padding:10px 28px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">Aplicar cambios</button>
+      <button id="exportCfgBtn" onclick="exportConfig()" style="background:rgba(45,212,191,.1);color:var(--teal);border:1px solid rgba(45,212,191,.3);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">⬇ Exportar config.json</button>
+      <span style="font-size:11px;color:var(--muted);max-width:320px;line-height:1.5">Descargá <code style="color:var(--teal)">config.json</code> y subilo a <code style="color:var(--teal)">/data/</code> en el repo para que los ajustes persistan al actualizar el dashboard.</span>
     </div>
     <div class="cfg-grid">
       <div class="cfg-card">
@@ -413,13 +415,20 @@ const SHEETS_NEEDED = [
 ];
 
 // Excel serial date to YYYY-MM-DD
+// Timezone-safe date → YYYY-MM-DD using local components (avoids UTC offset shift)
+function dateParts(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
 function xlDateToStr(serial) {
   if (!serial || typeof serial !== 'number') return null;
-  // Excel epoch: 1900-01-01 = 1, with leap year bug (day 60 = Feb 29 1900, skip)
-  const epoch = new Date(1899, 11, 30);
-  const d = new Date(epoch.getTime() + serial * 86400000);
+  // Excel epoch with leap-year bug: day 1 = 1900-01-01
+  const epoch = new Date(1899, 11, 30); // local time Dec 30 1899
+  const d = new Date(epoch.getFullYear(), epoch.getMonth(), epoch.getDate() + serial);
   if (isNaN(d)) return null;
-  return d.toISOString().slice(0, 10);
+  return dateParts(d);
 }
 
 function parseSheet(wb, name) {
@@ -440,11 +449,16 @@ function parseSheet(wb, name) {
     if (typeof fechaRaw === 'number') {
       fecha = xlDateToStr(fechaRaw);
     } else if (fechaRaw instanceof Date) {
-      fecha = fechaRaw.toISOString().slice(0,10);
+      fecha = dateParts(fechaRaw); // timezone-safe local components
     } else {
-      // Try string parse
-      const d = new Date(fechaRaw);
-      if (!isNaN(d)) fecha = d.toISOString().slice(0,10);
+      // Try string parse - if it looks like YYYY-MM-DD already, use directly
+      const s = String(fechaRaw).trim();
+      if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
+        fecha = s.slice(0,10);
+      } else {
+        const d = new Date(fechaRaw);
+        if (!isNaN(d)) fecha = dateParts(d);
+      }
     }
     if (!fecha || !fecha.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
     // avg is last column (index 26 = col 27)
@@ -571,9 +585,13 @@ async function loadAllData() {
     MONTH_CFG_DYN[key] = {TC: 1200, KP: 0.9};
   }
 
-  setProgress(98);
+  setProgress(95);
+  setStatus('Cargando configuración…');
+  const repoPrefs = await loadRepoConfig();
+
+  setProgress(99);
   setStatus('Construyendo dashboard…');
-  return {ALL_DATA, MONTH_META_DYN, MONTH_CFG_DYN, available};
+  return {ALL_DATA, MONTH_META_DYN, MONTH_CFG_DYN, available, repoPrefs};
 }
 
 
@@ -1417,16 +1435,24 @@ function buildConfig(){
 // initDashboard is called after data loads
 
 // ── PERSISTENCE ──────────────────────────────────────────────────────────────
+// Two layers:
+//   1. /data/config.json in the repo — survives HTML updates, shared across devices
+//   2. localStorage — fast runtime cache, fallback if repo config not found
 const PERSIST_KEY = 'ctaval_cfg_v1';
+const CONFIG_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/config.json';
 
 function savePrefs() {
   try {
     const prefs = {
+      _version: 1,
       CFG: {...CFG},
       MONTH_CFG: JSON.parse(JSON.stringify(MONTH_CFG)),
       LAST_MONTH: MONTH,
     };
     localStorage.setItem(PERSIST_KEY, JSON.stringify(prefs));
+    // Also update the export so user can commit to repo
+    window._lastPrefs = prefs;
+    updateExportBtn();
   } catch(e) { console.warn('Could not save prefs', e); }
 }
 
@@ -1440,20 +1466,45 @@ function loadPrefs() {
 
 function applyPrefs(prefs) {
   if (!prefs) return;
-  // Merge CFG (only known keys, so new config params from updates are kept at default)
   if (prefs.CFG) {
     Object.keys(CFG).forEach(k => {
       if (prefs.CFG[k] !== undefined) CFG[k] = prefs.CFG[k];
     });
   }
-  // Merge per-month settings
   if (prefs.MONTH_CFG) {
     Object.keys(prefs.MONTH_CFG).forEach(k => {
-      if (MONTH_CFG[k]) {
-        Object.assign(MONTH_CFG[k], prefs.MONTH_CFG[k]);
-      }
+      if (MONTH_CFG[k]) Object.assign(MONTH_CFG[k], prefs.MONTH_CFG[k]);
     });
   }
+}
+
+async function loadRepoConfig() {
+  try {
+    const r = await fetch(CONFIG_URL + '?t=' + Date.now());
+    if (!r.ok) return null;
+    const prefs = await r.json();
+    console.log('Loaded config.json from repo');
+    return prefs;
+  } catch(e) { return null; }
+}
+
+function exportConfig() {
+  const prefs = window._lastPrefs || {
+    _version: 1,
+    CFG: {...CFG},
+    MONTH_CFG: JSON.parse(JSON.stringify(MONTH_CFG)),
+    LAST_MONTH: MONTH,
+  };
+  const blob = new Blob([JSON.stringify(prefs, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'config.json';
+  a.click();
+}
+
+function updateExportBtn() {
+  const btn = document.getElementById('exportCfgBtn');
+  if (btn) { btn.style.background = 'rgba(52,211,153,.15)'; btn.style.borderColor = 'rgba(52,211,153,.4)'; }
 }
 
 function initDashboard(loadedData) {
@@ -1496,15 +1547,16 @@ function initDashboard(loadedData) {
   // Set current month to most recent
   MONTH = keys[keys.length - 1];
 
-  // Apply persisted user preferences (TC, KP, etc.) — overrides defaults
-  // but only for keys that already exist (avoids adding stale month keys)
-  applyPrefs(loadPrefs());
+  // Priority: repo config.json (shared/committed) < localStorage (local overrides)
+  // Both are already loaded: repoPrefs passed in, localStorage read now
+  if (loadedData.repoPrefs) applyPrefs(loadedData.repoPrefs);
+  const localPrefs = loadPrefs();
+  if (localPrefs) applyPrefs(localPrefs);
 
-  // Restore last-viewed month if still available
-  const savedPrefs = loadPrefs();
-  if (savedPrefs?.LAST_MONTH && MONTH_META[savedPrefs.LAST_MONTH]) {
-    MONTH = savedPrefs.LAST_MONTH;
-    // Update selector to show the saved month
+  // Restore last-viewed month (local prefs take priority)
+  const lastMonth = localPrefs?.LAST_MONTH || loadedData.repoPrefs?.LAST_MONTH;
+  if (lastMonth && MONTH_META[lastMonth]) {
+    MONTH = lastMonth;
     const selEl = document.getElementById('monthSel');
     if (selEl) selEl.value = MONTH;
   }
