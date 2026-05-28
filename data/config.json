@@ -1,0 +1,20 @@
+{
+  "_version": 1,
+  "_note": "Este archivo guarda la configuración del dashboard. Editalo y commitealo a /data/ para que los cambios persistan al actualizar el index.html.",
+  "CFG": {
+    "FRA": 0.15,
+    "RMIN_LO": 2,
+    "RMIN_HI": 7,
+    "RMIN_THR": 60,
+    "CONF": 2000,
+    "CANON_AGUA": 840,
+    "TRANSPORTE": 2,
+    "ENRE": 552669.0
+  },
+  "MONTH_CFG": {
+    "2026_03": { "TC": 1450, "KP": 0.9 },
+    "2026_04": { "TC": 1381.0954, "KP": 0.9 },
+    "2026_05": { "TC": 1400, "KP": 0.9 }
+  },
+  "LAST_MONTH": "2026_05"
+}
