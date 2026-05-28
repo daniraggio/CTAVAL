@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Dashboard AVAL</title>
+<title>Central Térmica Alto Valle</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.14);--text:#e8eaf0;--muted:#7a8099;--accent:#4f8ef7;--danger:#f87171;--success:#34d399;--warn:#fbbf24;--purple:#a78bfa;--teal:#2dd4bf;--orange:#fb923c;--mono:'Space Mono',monospace;--body:'DM Sans',sans-serif;--r:10px;--rl:16px;}
@@ -94,7 +94,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 <body>
 
 <div id="load-screen" style="position:fixed;inset:0;background:#0d0f14;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:20px">
-  <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:#4f8ef7;letter-spacing:.1em">CTAVAL</div>
+  <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:#4f8ef7;letter-spacing:.1em">Central Térmica Alto Valle</div>
   <div id="load-status" style="font-size:13px;color:#7a8099;max-width:400px;text-align:center;line-height:1.6">Iniciando…</div>
   <div style="width:320px;height:4px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
     <div id="load-bar" style="height:100%;width:0%;background:#4f8ef7;border-radius:4px;transition:width .3s"></div>
@@ -104,7 +104,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 <div class="shell">
 <aside class="sidebar">
   <div class="logo">
-    <div class="logo-title">AVAL</div>
+    <div class="logo-title">Alto Valle</div>
     <div class="logo-sub" id="sidebar-sub">PosOperativo</div>
   </div>
   <div class="month-select-wrap">
@@ -426,6 +426,7 @@ function parseSheet(wb, name) {
   const ws = wb.Sheets[name];
   if (!ws) return null;
   // Get raw array-of-arrays (no header auto-detection)
+  // cellDates:true in XLSX.read means dates come as JS Date objects
   const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
   // Data rows start at index 3 (rows 0-2 are title/headers/blank)
   const rows = [];
@@ -461,6 +462,9 @@ function parseSheet(wb, name) {
     if (hasH) r.h = h;
     rows.push(r);
   }
+  if (rows.length === 0) {
+    console.warn('parseSheet: 0 rows parsed for', name, '— first 4 raw rows:', aoa.slice(0,4));
+  }
   return {rows};
 }
 
@@ -479,7 +483,7 @@ async function fetchXLS(filename) {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${filename}`);
   const buf = await resp.arrayBuffer();
-  return XLSX.read(buf, {type:'array', cellDates:false});
+  return XLSX.read(buf, {type:'array', cellDates:true, cellNF:false, cellText:false});
 }
 
 // Extract YYYY and MM from filename AVAL_YYYY_MM.xls
@@ -613,6 +617,7 @@ function saveConfig(){
   ['resumen','resumenUSD','potencia','remuneracion','costos'].forEach(id=>built.delete(id));
   const cur=document.querySelector('.sec.active');
   if(cur)buildSection(cur.id.replace('sec-',''));
+  savePrefs();
   showCfgSaved();
 }
 function showCfgSaved(){
@@ -633,6 +638,7 @@ function updateFormulaPreview(){
 let MONTH=''; // set by initDashboard after load
 function switchMonth(){
   MONTH=document.getElementById('monthSel').value;
+  savePrefs();
   document.getElementById('sidebar-sub').textContent=MONTH_META[MONTH].label;
   document.getElementById('period-badge').textContent=MONTH_META[MONTH].badge;
   built.clear();
@@ -898,7 +904,18 @@ const fmtFull=n=>n==null||isNaN(n)?'—':Math.round(n).toLocaleString('es-AR');
 const fmtK=n=>{if(n==null||isNaN(n))return'—';const a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);};
 function lerpColor(v,mn,mx){if(mx===mn)return'rgba(79,142,247,0.3)';const t=(v-mn)/(mx-mn);if(t<0.33)return`rgba(45,212,191,${0.2+t*1.5})`;if(t<0.66)return`rgba(251,191,36,${0.4+t})`;return`rgba(248,113,113,${0.5+t*0.5})`;}
 let charts={};
-function mkChart(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);}
+function mkChart(id,cfg){
+  const el=document.getElementById(id);
+  if(!el){console.warn('Canvas not found:',id);return;}
+  if(charts[id]){try{charts[id].destroy();}catch(e){}}
+  // Ensure canvas has dimensions before rendering
+  if(el.offsetParent===null||el.clientWidth===0){
+    // Canvas is in hidden parent — temporarily force dimensions
+    el.style.width='100%';el.style.height='260px';
+  }
+  try{charts[id]=new Chart(el,cfg);}
+  catch(e){console.error('Chart error for',id,e);}
+}
 
 // Common chart options
 const legendOpts={display:true,position:'bottom',labels:{color:'#7a8099',font:{size:11},boxWidth:10,boxHeight:10,padding:12}};
@@ -1398,9 +1415,55 @@ function buildConfig(){
 
 // ── INIT ────────────────────────────────────────────────────────────────────
 // initDashboard is called after data loads
+
+// ── PERSISTENCE ──────────────────────────────────────────────────────────────
+const PERSIST_KEY = 'ctaval_cfg_v1';
+
+function savePrefs() {
+  try {
+    const prefs = {
+      CFG: {...CFG},
+      MONTH_CFG: JSON.parse(JSON.stringify(MONTH_CFG)),
+      LAST_MONTH: MONTH,
+    };
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(prefs));
+  } catch(e) { console.warn('Could not save prefs', e); }
+}
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch(e) { return null; }
+}
+
+function applyPrefs(prefs) {
+  if (!prefs) return;
+  // Merge CFG (only known keys, so new config params from updates are kept at default)
+  if (prefs.CFG) {
+    Object.keys(CFG).forEach(k => {
+      if (prefs.CFG[k] !== undefined) CFG[k] = prefs.CFG[k];
+    });
+  }
+  // Merge per-month settings
+  if (prefs.MONTH_CFG) {
+    Object.keys(prefs.MONTH_CFG).forEach(k => {
+      if (MONTH_CFG[k]) {
+        Object.assign(MONTH_CFG[k], prefs.MONTH_CFG[k]);
+      }
+    });
+  }
+}
+
 function initDashboard(loadedData) {
   // Populate global data
   Object.assign(ALL_DATA, loadedData.ALL_DATA);
+  // Debug: log loaded months and row counts
+  Object.keys(ALL_DATA).forEach(mk => {
+    const e = ALL_DATA[mk]['AVALTG23-ENERGIA'];
+    console.log('Loaded', mk, '— TG23 rows:', e?.rows?.length ?? 'MISSING');
+  });
   Object.assign(MONTH_META, loadedData.MONTH_META_DYN);
   Object.assign(MONTH_CFG, loadedData.MONTH_CFG_DYN);
   // Apply known TC defaults (user can override in config)
@@ -1433,13 +1496,35 @@ function initDashboard(loadedData) {
   // Set current month to most recent
   MONTH = keys[keys.length - 1];
 
+  // Apply persisted user preferences (TC, KP, etc.) — overrides defaults
+  // but only for keys that already exist (avoids adding stale month keys)
+  applyPrefs(loadPrefs());
+
+  // Restore last-viewed month if still available
+  const savedPrefs = loadPrefs();
+  if (savedPrefs?.LAST_MONTH && MONTH_META[savedPrefs.LAST_MONTH]) {
+    MONTH = savedPrefs.LAST_MONTH;
+    // Update selector to show the saved month
+    const selEl = document.getElementById('monthSel');
+    if (selEl) selEl.value = MONTH;
+  }
+
   // Hide loader, show dashboard
   document.getElementById('load-screen').style.display = 'none';
   document.getElementById('period-badge').textContent = MONTH_META[MONTH]?.badge || MONTH;
   document.getElementById('sidebar-sub').textContent = MONTH_META[MONTH]?.label || MONTH;
   const fraEl = document.getElementById('fml-fra');
   if (fraEl) fraEl.textContent = CFG.FRA;
-  buildSection('resumen');
+  // Small delay to ensure DOM is ready for Chart.js dimension calculations
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      try {
+        buildSection('resumen');
+      } catch(e) {
+        console.error('buildSection error:', e);
+      }
+    });
+  });
 }
 
 window.showSec=showSec;window.setETab=setETab;window.setRemTab=setRemTab;window.setHmapTab=setHmapTab;window.switchMonth=switchMonth;window.saveConfig=saveConfig;window.setPotDbgTab=setPotDbgTab;window.mkResumenTable=mkResumenTable;
