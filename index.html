@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard AVAL</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.14);--text:#e8eaf0;--muted:#7a8099;--accent:#4f8ef7;--danger:#f87171;--success:#34d399;--warn:#fbbf24;--purple:#a78bfa;--teal:#2dd4bf;--orange:#fb923c;--mono:'Space Mono',monospace;--body:'DM Sans',sans-serif;--r:10px;--rl:16px;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14px;line-height:1.5;min-height:100vh;}
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh;}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.logo{padding:20px 20px 16px;border-bottom:1px solid var(--border);}
+.logo-title{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.month-select-wrap{padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.month-select-wrap label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:6px;}
+.month-select{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--mono);font-size:12px;font-weight:700;padding:7px 10px;cursor:pointer;}
+.month-select:focus{outline:none;border-color:var(--accent);}
+.nav{padding:12px 12px 0;flex:1;}
+.nav-group{margin-bottom:4px;}
+.nav-label{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding:8px 8px 4px;}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;border:none;background:none;width:100%;text-align:left;}
+.ni:hover{background:rgba(79,142,247,.08);color:var(--text);}
+.ni.active{background:rgba(79,142,247,.15);color:var(--accent);font-weight:500;}
+.nd{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .15s;}
+.ni.active .nd{background:var(--accent);}
+.ni:hover .nd{background:var(--text);}
+.main{padding:28px 32px;overflow-y:auto;min-width:0;}
+.hdr{margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.page-title{font-size:22px;font-weight:600;color:var(--text);}
+.page-sub{font-size:13px;color:var(--muted);margin-top:3px;}
+.badge{background:rgba(79,142,247,.15);color:var(--accent);font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid rgba(79,142,247,.25);font-family:var(--mono);white-space:nowrap;}
+.sec{display:none;}.sec.active{display:block;}
+.kr{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:15px 17px;}
+.kpi-lbl{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px;}
+.kpi-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--text);}
+.kpi-val.a{color:var(--accent);}.kpi-val.s{color:var(--success);}.kpi-val.w{color:var(--warn);}.kpi-val.d{color:var(--danger);}.kpi-val.p{color:var(--purple);}
+.kpi-unit{font-size:11px;color:var(--muted);margin-top:2px;}
+.up{color:var(--success);}.dn{color:var(--danger);}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:18px 20px;margin-bottom:18px;}
+.card-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;}
+.card-title{font-size:13px;font-weight:600;color:var(--text);}
+.card-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.cw{position:relative;width:100%;height:260px;}
+.cw-sm{position:relative;width:100%;height:200px;}
+.tabs{display:flex;gap:3px;background:var(--surface2);border-radius:8px;padding:3px;margin-bottom:16px;flex-wrap:wrap;}
+.tab{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--muted);transition:all .15s;}
+.tab.active{background:rgba(79,142,247,.2);color:var(--accent);}
+.tab:hover:not(.active){color:var(--text);}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+.g2 .card{margin-bottom:0;}
+@media(max-width:1000px){.g2{grid-template-columns:1fr;}}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{text-align:left;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;padding:0 8px 8px 0;border-bottom:1px solid var(--border);}
+.tbl td{padding:8px 8px 8px 0;border-bottom:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(255,255,255,.02);}
+.tbl .num{text-align:right;}.tbl .lbl{font-family:var(--body);font-size:12px;}
+.tbl .bold{font-weight:600;color:var(--text);}
+.tbl .hi{background:rgba(79,142,247,.07);}
+.tbl .hi2{background:rgba(251,191,36,.06);}
+.leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;}
+.li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);}
+.ld{width:8px;height:8px;border-radius:2px;}
+.hmap-wrap{overflow-x:auto;}
+.hmap{border-collapse:collapse;font-size:10px;}
+.hmap th{font-size:9px;color:var(--muted);font-weight:500;padding:0 2px 5px;text-align:center;}
+.hmap td{width:24px;height:20px;text-align:center;border-radius:2px;}
+.hmap .rl{font-family:var(--body);font-size:11px;color:var(--muted);text-align:right;padding-right:6px;width:auto;white-space:nowrap;}
+.note{font-size:11px;color:var(--muted);padding:10px 14px;background:rgba(79,142,247,.06);border-left:2px solid var(--accent);border-radius:4px;margin-top:10px;}
+.tc-bar{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:12px 16px;margin-bottom:18px;flex-wrap:wrap;}
+.tc-bar label{font-size:12px;color:var(--muted);white-space:nowrap;}
+.inp{background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:14px;font-weight:700;padding:6px 10px;width:130px;text-align:right;}
+.inp:focus{outline:none;border-color:var(--accent);}
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:20px;}
+.cfg-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:20px;}
+.cfg-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em;}
+.cfg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+.cfg-row label{font-size:12px;color:var(--muted);}
+.cfg-inp{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:14px;font-weight:700;padding:6px 10px;width:100px;text-align:right;}
+.cfg-inp:focus{outline:none;border-color:var(--accent);}
+.formula-box{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:14px 16px;font-family:var(--mono);font-size:12px;color:var(--teal);line-height:1.8;}
+.formula-box span{color:var(--muted);}
+.sub-tabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;}
+.stab{padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;border:1px solid var(--border2);background:none;color:var(--muted);transition:all .15s;}
+.stab.active{background:rgba(79,142,247,.15);color:var(--accent);border-color:rgba(79,142,247,.3);}
+.stab:hover:not(.active){color:var(--text);}
+.dbg-note{font-size:11px;color:var(--warn);padding:8px 12px;background:rgba(251,191,36,.07);border-left:2px solid var(--warn);border-radius:4px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<div id="load-screen" style="position:fixed;inset:0;background:#0d0f14;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:20px">
+  <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:#4f8ef7;letter-spacing:.1em">CTAVAL</div>
+  <div id="load-status" style="font-size:13px;color:#7a8099;max-width:400px;text-align:center;line-height:1.6">Iniciando…</div>
+  <div style="width:320px;height:4px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
+    <div id="load-bar" style="height:100%;width:0%;background:#4f8ef7;border-radius:4px;transition:width .3s"></div>
+  </div>
+  <div style="font-size:11px;color:#4a5568">Descargando planillas desde GitHub…</div>
+</div>
+<div class="shell">
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-title">AVAL</div>
+    <div class="logo-sub" id="sidebar-sub">PosOperativo</div>
+  </div>
+  <div class="month-select-wrap">
+    <label>Período en análisis</label>
+    <select class="month-select" id="monthSel" onchange="switchMonth()">
+      <option value="">Cargando…</option>
+    </select>
+  </div>
+  <nav class="nav">
+    <div class="nav-group">
+      <div class="nav-label">Overview</div>
+      <button class="ni active" onclick="showSec('resumen')"><span class="nd"></span>Resumen ($)</button>
+      <button class="ni" onclick="showSec('resumenUSD')"><span class="nd"></span>Resumen (USD)</button>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Energía</div>
+      <button class="ni" onclick="showSec('energia')"><span class="nd"></span>Energía MWh</button>
+      <button class="ni" onclick="showSec('cmo')"><span class="nd"></span>CMO $/MWh</button>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Costos CVP</div>
+      <button class="ni" onclick="showSec('combrem')"><span class="nd"></span>CVP Comb. Rem.</button>
+      <button class="ni" onclick="showSec('transpprov')"><span class="nd"></span>CVP Transp. Prov.</button>
+      <button class="ni" onclick="showSec('oym')"><span class="nd"></span>CVP O&amp;M Rem.</button>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Análisis</div>
+      <button class="ni" onclick="showSec('costos')"><span class="nd"></span>Costos</button>
+      <button class="ni" onclick="showSec('potencia')"><span class="nd"></span>Potencia</button>
+      <button class="ni" onclick="showSec('remuneracion')"><span class="nd"></span>Remuneración</button>
+      <button class="ni" onclick="showSec('heatmap')"><span class="nd"></span>Perfil horario</button>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Sistema</div>
+      <button class="ni" onclick="showSec('config')"><span class="nd"></span>Configuración</button>
+    </div>
+  </nav>
+</aside>
+
+<main class="main">
+  <div class="hdr">
+    <div>
+      <div class="page-title" id="page-title">Resumen general</div>
+      <div class="page-sub" id="page-sub">Acumulados del mes</div>
+    </div>
+    <div class="badge" id="period-badge">–</div>
+  </div>
+
+  <!-- RESUMEN ARS -->
+  <div class="sec active" id="sec-resumen">
+    <div class="g2" style="margin-bottom:18px">
+      <div class="card" style="padding:20px 24px">
+        <div class="card-title" style="margin-bottom:14px">Resumen del mes</div>
+        <div id="tbl-resumen-kpi"></div>
+      </div>
+      <div class="card" style="padding:20px 24px">
+        <div class="card-title" style="margin-bottom:14px">Tipo de cambio activo</div>
+        <div id="tbl-resumen-tc"></div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — promedio horario diario</div></div></div>
+        <div class="cw"><canvas id="cEnergiaRes" role="img" aria-label="Energía diaria por activo"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">CMO — Costo Marginal Operado</div><div class="card-sub">$/MWh · promedio diario</div></div></div>
+        <div class="cw"><canvas id="cCmoRes" role="img" aria-label="CMO diario"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUMEN USD -->
+  <div class="sec" id="sec-resumenUSD">
+    <div class="g2" style="margin-bottom:18px">
+      <div class="card" style="padding:20px 24px">
+        <div class="card-title" style="margin-bottom:14px">Resumen del mes (USD)</div>
+        <div id="tbl-resumenUSD-kpi"></div>
+      </div>
+      <div class="card" style="padding:20px 24px">
+        <div class="card-title" style="margin-bottom:14px">Tipo de cambio activo</div>
+        <div id="tbl-resumenUSD-tc"></div>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — promedio horario diario</div></div></div>
+        <div class="cw"><canvas id="cEnergiaResUSD" role="img" aria-label="Energía diaria USD"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">CMO — Costo Marginal Operado</div><div class="card-sub">USD/MWh · promedio diario</div></div></div>
+        <div class="cw"><canvas id="cCmoResUSD" role="img" aria-label="CMO diario USD"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENERGÍA -->
+  <div class="sec" id="sec-energia">
+    <div class="kr" id="kpi-energia"></div>
+    <div class="tabs" id="tabs-energia"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="eChartTitle">Energía asignada diaria</div><div class="card-sub">MWh — promedio horario</div></div></div>
+      <div class="cw"><canvas id="cEnergiaDetail" role="img" aria-label="Energía asignada diaria"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CMO -->
+  <div class="sec" id="sec-cmo">
+    <div class="kr" id="kpi-cmo"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">CMO diario completo</div><div class="card-sub">$/MWh</div></div></div>
+      <div class="cw" style="height:300px"><canvas id="cCmoFull" role="img" aria-label="CMO diario"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CVP COMBREM -->
+  <div class="sec" id="sec-combrem">
+    <div class="kr" id="kpi-combrem"></div>
+    <div class="tabs" id="tabs-combrem"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="combremTitle">CVP Costo Combustible Remuneración</div><div class="card-sub">$/MWh · valor diario</div></div></div>
+      <div class="cw"><canvas id="cCombRem" role="img" aria-label="CVP Comb Rem"></canvas></div>
+    </div>
+    <div class="card" id="card-combrem-dbg">
+      <div class="card-hdr"><div><div class="card-title">Tabla detalle por hora</div><div class="card-sub">Debug — valores horarios $/MWh</div></div></div>
+      <div class="dbg-note">Tabla de debug: muestra los valores horarios crudos de la planilla.</div>
+      <div style="overflow-x:auto"><table class="tbl hmap" id="tbl-combrem-dbg" style="font-size:10px"></table></div>
+    </div>
+  </div>
+
+  <!-- CVP TRANSP -->
+  <div class="sec" id="sec-transpprov">
+    <div class="kr" id="kpi-transpprov"></div>
+    <div class="tabs" id="tabs-transpprov"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="transpTitle">CVP Transporte Combustible Provisto</div><div class="card-sub">$/MWh</div></div></div>
+      <div class="cw"><canvas id="cTranspProv" role="img" aria-label="CVP Transp Prov"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Tabla detalle por hora</div><div class="card-sub">Debug</div></div></div>
+      <div class="dbg-note">Tabla de debug: valores horarios crudos $/MWh.</div>
+      <div style="overflow-x:auto"><table class="tbl hmap" id="tbl-transp-dbg" style="font-size:10px"></table></div>
+    </div>
+  </div>
+
+  <!-- CVP OYM -->
+  <div class="sec" id="sec-oym">
+    <div class="kr" id="kpi-oym"></div>
+    <div class="tabs" id="tabs-oym"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="oymTitle">CVP O&amp;M Remuneración</div><div class="card-sub">$/MWh</div></div></div>
+      <div class="cw"><canvas id="cOym" role="img" aria-label="CVP OyM Rem"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Tabla detalle por hora</div><div class="card-sub">Debug</div></div></div>
+      <div class="dbg-note">Tabla de debug: valores horarios crudos $/MWh.</div>
+      <div style="overflow-x:auto"><table class="tbl hmap" id="tbl-oym-dbg" style="font-size:10px"></table></div>
+    </div>
+  </div>
+
+  <!-- REMUNERACIÓN -->
+  <div class="sec" id="sec-remuneracion">
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-title" style="margin-bottom:10px">Fórmula de remuneración (por hora y máquina)</div>
+      <div class="formula-box">
+        REM = CVP_TOTAL + MAX(RMIN ; (CMO × FP − CVP_TOTAL) × FRA)<br>
+        <span>CVP_TOTAL = CVP_Comb + CVP_Transp + CVP_OyM (todos en $/MWh)</span><br>
+        <span>RMIN = 2 si CVP_TOTAL &lt; 60 | RMIN = 7 si CVP_TOTAL ≥ 60</span><br>
+        <span>FRA = <span id="fml-fra" style="color:var(--warn)">0.15</span> · FP = Factor de Pérdidas por máquina/hora</span><br>
+        <span>+ Remuneración por Potencia = POT_DISP_TOTAL × <span id="fml-usdmw" style="color:var(--teal)">12</span> USD/MW × TC</span>
+      </div>
+    </div>
+    <div class="kr" id="kpi-rem"></div>
+    <div class="sub-tabs" id="stabs-rem"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="remChartTitle">Remuneración diaria</div><div class="card-sub">$/MWh promedio diario · suma de todas las horas activas</div></div></div>
+      <div class="cw"><canvas id="cRemLine" role="img" aria-label="Remuneración diaria"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="remTblTitle">Tabla detalle de remuneración</div><div class="card-sub">Valores diarios por componente</div></div></div>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-rem"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Tabla hora por hora (debug)</div><div class="card-sub">Valores horarios crudos $/MWh</div></div></div>
+      <div class="dbg-note">Tabla de debug: muestra REM hora a hora para controlar el cálculo.</div>
+      <div style="overflow-x:auto"><table class="tbl hmap" id="tbl-rem-dbg" style="font-size:10px"></table></div>
+    </div>
+  </div>
+
+  <!-- POTENCIA -->
+  <div class="sec" id="sec-potencia">
+    <div class="kr" id="kpi-pot"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Potencia disponible por máquina</div><div class="card-sub">MW — promedio horario diario</div></div></div>
+      <div class="leg" id="leg-pot"></div>
+      <div class="cw"><canvas id="cPotLine" role="img" aria-label="Potencia diaria por activo"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Tabla detalle de potencia</div><div class="card-sub">Acumulado horario por día</div></div></div>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-pot"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Tabla hora por hora (debug)</div><div class="card-sub">Valores horarios crudos MW</div></div></div>
+      <div class="dbg-note">Debug: potencia disponible hora a hora. Hover muestra el valor exacto.</div>
+      <div class="sub-tabs" id="stabs-pot"></div>
+      <div style="overflow-x:auto"><table class="tbl hmap" id="tbl-pot-dbg" style="font-size:10px"></table></div>
+    </div>
+  </div>
+
+  <!-- COSTOS -->
+  <div class="sec" id="sec-costos">
+    <div class="kr" id="kpi-costos"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Costo Gas por máquina</div><div class="card-sub">(CVP Comb. Rem. + CVP Transp. Rem.) × Energía generada — acumulado mes</div></div></div>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-costos"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Evolución diaria del Costo Gas</div><div class="card-sub">$ acumulado día a día</div></div></div>
+      <div class="cw"><canvas id="cCostosLine" role="img" aria-label="Costo Gas diario"></canvas></div>
+    </div>
+  </div>
+
+  <!-- HEATMAP -->
+  <div class="sec" id="sec-heatmap">
+    <div class="tabs" id="tabs-heatmap"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="hmapTitle">Perfil horario diario</div><div class="card-sub">Gradiente de intensidad</div></div></div>
+      <div class="hmap-wrap"><table class="hmap" id="tbl-hmap"></table></div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+        <span>Bajo</span><div id="hmap-leg-bar" style="height:10px;width:140px;border-radius:4px"></div><span>Alto</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="sec" id="sec-config">
+    <div class="cfg-grid">
+      <div class="cfg-card">
+        <div class="cfg-title">Parámetros de remuneración</div>
+        <div class="cfg-row"><label>FRA (fracción de diferencia)</label><input class="cfg-inp" type="number" id="cfgFRA" value="0.15" step="0.01" min="0" max="1"></div>
+        <div class="cfg-row"><label>RMIN cuando CVP &lt; umbral</label><input class="cfg-inp" type="number" id="cfgRMIN_LO" value="2" step="0.1"></div>
+        <div class="cfg-row"><label>RMIN cuando CVP ≥ umbral</label><input class="cfg-inp" type="number" id="cfgRMIN_HI" value="7" step="0.1"></div>
+        <div class="cfg-row"><label>Umbral CVP ($/MWh)</label><input class="cfg-inp" type="number" id="cfgRMIN_THR" value="60" step="1"></div>
+      </div>
+      <div class="cfg-card">
+        <div class="cfg-title">Confiabilidad</div>
+        <div class="cfg-row"><label>Precio confiabilidad (USD)</label><input class="cfg-inp" type="number" id="cfgCONF" value="2000" step="100"></div>
+        <div class="note" style="margin-top:12px">REM_Conf = Pot.Mes × Confiabilidad × TC</div>
+      </div>
+      <div class="cfg-card">
+        <div class="cfg-title">Costos adicionales</div>
+        <div class="cfg-row"><label>Canon del Agua ($/MWh)</label><input class="cfg-inp" type="number" id="cfgCANON" value="840" step="1"></div>
+        <div class="cfg-row"><label>Transporte ($)</label><input class="cfg-inp" type="number" id="cfgTRANSPORTE" value="2" step="0.01"></div>
+        <div class="cfg-row"><label>ENRE ($)</label><input class="cfg-inp" type="number" id="cfgENRE" value="552669" step="1"></div>
+        <div class="note" style="margin-top:8px">ENRE default = 1.658.007 / 3</div>
+      </div>
+    </div>
+    <div class="cfg-grid" id="cfg-per-month-grid">
+      <!-- filled dynamically per month -->
+    </div>
+    <div style="padding:4px 0 20px">
+      <button id="cfgApplyBtn" onclick="saveConfig()" style="background:rgba(79,142,247,.2);color:var(--accent);border:1px solid rgba(79,142,247,.4);border-radius:8px;padding:10px 28px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">Aplicar cambios</button>
+    </div>
+    <div class="cfg-grid">
+      <div class="cfg-card">
+        <div class="cfg-title">Fórmula activa</div>
+        <div class="formula-box" id="cfg-formula-preview"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// Will be populated after data load
+let ALL_DATA = {};
+
+
+// ── GITHUB DATA LOADER ───────────────────────────────────────────────────────
+// Repo base for raw file access
+const GITHUB_RAW = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/';
+
+// Known month → file mapping derived from AVAL_YYYY_MM.xls pattern
+// We'll auto-discover by trying to fetch; months are added dynamically
+const MONTH_NAME = {
+  '01':'Enero','02':'Febrero','03':'Marzo','04':'Abril',
+  '05':'Mayo','06':'Junio','07':'Julio','08':'Agosto',
+  '09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'
+};
+const DAYS_IN = {'01':31,'02':28,'03':31,'04':30,'05':31,'06':30,
+                 '07':31,'08':31,'09':30,'10':31,'11':30,'12':31};
+
+const SHEETS_NEEDED = [
+  'AVALTG23-ENERGIA','AVALTG22-ENERGIA','AVALTV11-ENERGIA','AVALTV12-ENERGIA',
+  'AVALTG23-CVPCOMBREM-GX','AVALTG22-CVPCOMBREM-GX','AVALTV11-CVPCOMBREM-GX','AVALTV12-CVPCOMBREM-GX',
+  'AVALTG22-CVPTRANSPREMPROV-GX','AVALTG23-CVPTRANSPREMPROV-GX',
+  'AVALTG22-CVPOYMREM-GX','AVALTG23-CVPOYMREM-GX','PRECIOS-CMO',
+  'AVALTG23-FACTOR_PERDIDAS','AVALTG22-FACTOR_PERDIDAS','AVALTV11-FACTOR_PERDIDAS','AVALTV12-FACTOR_PERDIDAS',
+  'AVALTG23-PRECIO_NODO','AVALTG22-PRECIO_NODO','AVALTV11-PRECIO_NODO','AVALTV12-PRECIO_NODO',
+  'AVALTG23-POT_DISP','AVALTG22-POT_DISP','AVALTV11-POT_DISP','AVALTV12-POT_DISP',
+  'PRECIOS-PPAD','RPF-PRECIO_RPF',
+  'AVALTV11-RPF_GEN-PORC_RPF','AVALTV12-RPF_GEN-PORC_RPF',
+  'AVALTG22-RPF_GEN-PORC_RPF','AVALTG23-RPF_GEN-PORC_RPF',
+];
+
+// Excel serial date to YYYY-MM-DD
+function xlDateToStr(serial) {
+  if (!serial || typeof serial !== 'number') return null;
+  // Excel epoch: 1900-01-01 = 1, with leap year bug (day 60 = Feb 29 1900, skip)
+  const epoch = new Date(1899, 11, 30);
+  const d = new Date(epoch.getTime() + serial * 86400000);
+  if (isNaN(d)) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function parseSheet(wb, name) {
+  const ws = wb.Sheets[name];
+  if (!ws) return null;
+  // Get raw array-of-arrays (no header auto-detection)
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  // Data rows start at index 3 (rows 0-2 are title/headers/blank)
+  const rows = [];
+  for (let ri = 3; ri < aoa.length; ri++) {
+    const row = aoa[ri];
+    if (!row || row.length < 2) continue;
+    const fechaRaw = row[0];
+    if (fechaRaw == null) continue;
+    // Parse date: could be Excel serial or already a date string
+    let fecha;
+    if (typeof fechaRaw === 'number') {
+      fecha = xlDateToStr(fechaRaw);
+    } else if (fechaRaw instanceof Date) {
+      fecha = fechaRaw.toISOString().slice(0,10);
+    } else {
+      // Try string parse
+      const d = new Date(fechaRaw);
+      if (!isNaN(d)) fecha = d.toISOString().slice(0,10);
+    }
+    if (!fecha || !fecha.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+    // avg is last column (index 26 = col 27)
+    const avg = parseFloat(row[26]) || 0;
+    // hourly values: indices 2..25 (columns 3..26)
+    const h = [];
+    let hasH = false;
+    for (let hi = 0; hi < 24; hi++) {
+      const v = row[2 + hi];
+      const fv = (v != null && v !== '') ? parseFloat(v) : null;
+      h.push(isNaN(fv) ? null : fv);
+      if (fv != null && !isNaN(fv)) hasH = true;
+    }
+    const r = {fecha, avg: isNaN(avg) ? 0 : avg};
+    if (hasH) r.h = h;
+    rows.push(r);
+  }
+  return {rows};
+}
+
+function setStatus(msg) {
+  const el = document.getElementById('load-status');
+  if (el) el.textContent = msg;
+}
+
+function setProgress(pct) {
+  const bar = document.getElementById('load-bar');
+  if (bar) bar.style.width = Math.round(pct) + '%';
+}
+
+async function fetchXLS(filename) {
+  const url = GITHUB_RAW + filename;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${filename}`);
+  const buf = await resp.arrayBuffer();
+  return XLSX.read(buf, {type:'array', cellDates:false});
+}
+
+// Extract YYYY and MM from filename AVAL_YYYY_MM.xls
+function fileToMonthKey(filename) {
+  const m = filename.match(/AVAL_(\d{4})_(\d{2})\.xls$/i);
+  if (!m) return null;
+  return {year: m[1], mm: m[2], key: `${MONTH_NAME[m[2]]}${m[1]}`};
+}
+
+async function loadAllData() {
+  document.getElementById('load-screen').style.display = 'flex';
+
+  // Step 1: discover available files
+  // Try AVAL_2026_01.xls through AVAL_2026_12.xls + reasonable year range
+  setStatus('Detectando planillas disponibles…');
+  const candidates = [];
+  // Scan years 2025-2027, months 01-12
+  for (const year of ['2025','2026','2027']) {
+    for (let mo = 1; mo <= 12; mo++) {
+      const mm = String(mo).padStart(2,'0');
+      candidates.push(`AVAL_${year}_${mm}.xls`);
+    }
+  }
+
+  // Probe files with HEAD requests
+  const available = [];
+  const probeChunks = 6; // parallel probe batches
+  for (let i = 0; i < candidates.length; i += probeChunks) {
+    const batch = candidates.slice(i, i + probeChunks);
+    const results = await Promise.allSettled(
+      batch.map(f => fetch(GITHUB_RAW + f, {method:'HEAD'}))
+    );
+    results.forEach((r, j) => {
+      if (r.status === 'fulfilled' && r.value.ok) available.push(batch[j]);
+    });
+    setProgress((i / candidates.length) * 30);
+  }
+
+  if (!available.length) {
+    setStatus('❌ No se encontraron planillas en /data. Verificá que los archivos AVAL_YYYY_MM.xls estén en la carpeta data/ del repositorio.');
+    return null;
+  }
+
+  setStatus(`Encontradas ${available.length} planilla(s): ${available.join(', ')}`);
+
+  // Step 2: parse each file
+  const ALL_DATA = {};
+  const MONTH_META_DYN = {};
+  const MONTH_CFG_DYN = {};
+
+  for (let fi = 0; fi < available.length; fi++) {
+    const filename = available[fi];
+    const info = fileToMonthKey(filename);
+    if (!info) continue;
+    const {year, mm, key} = info;
+
+    setStatus(`Cargando ${filename}…`);
+    setProgress(30 + (fi / available.length) * 65);
+
+    let wb;
+    try {
+      wb = await fetchXLS(filename);
+    } catch(e) {
+      console.warn(`Could not load ${filename}:`, e);
+      continue;
+    }
+
+    ALL_DATA[key] = {};
+    for (const sheet of SHEETS_NEEDED) {
+      const parsed = parseSheet(wb, sheet);
+      if (parsed) ALL_DATA[key][sheet] = parsed;
+    }
+
+    // Auto-detect days in month from actual data
+    const eRows = ALL_DATA[key]['AVALTG23-ENERGIA']?.rows || [];
+    const daysActual = eRows.length || DAYS_IN[mm] || 30;
+
+    const monthLabel = `${MONTH_NAME[mm]} ${year}`;
+    MONTH_META_DYN[key] = {
+      label: monthLabel,
+      badge: `${monthLabel} · ${daysActual} días`
+    };
+    // Default TC and KP — user can override in config
+    MONTH_CFG_DYN[key] = {TC: 1200, KP: 0.9};
+  }
+
+  setProgress(98);
+  setStatus('Construyendo dashboard…');
+  return {ALL_DATA, MONTH_META_DYN, MONTH_CFG_DYN, available};
+}
+
+
+// ── CONFIG ─────────────────────────────────────────────────────────────────
+// Per-month settings: TC and KP indexed by month key
+// Per-month config (populated by loader)
+// Mutable per-month config:
+// MONTH_CFG and MONTH_META are populated dynamically by the loader
+const MONTH_CFG = {};   // {key: {TC, KP}}
+let MONTH_META = {};    // {key: {label, badge}}
+
+// Global config
+let CFG={FRA:0.15,RMIN_LO:2,RMIN_HI:7,RMIN_THR:60,CONF:2000,
+  CANON_AGUA:840, TRANSPORTE:2, ENRE:1658007/3};
+
+// Per-month TC defaults (user-configurable in UI)
+const MONTH_TC_DEFAULTS = {
+  // Added by loader; user can override
+};
+
+function getTC(){return MONTH_CFG[MONTH]?.TC||1200;}
+function getKP(){return MONTH_CFG[MONTH]?.KP||0.9;}
+
+function saveConfig(){
+  CFG.FRA=parseFloat(document.getElementById('cfgFRA').value)||0.15;
+  CFG.RMIN_LO=parseFloat(document.getElementById('cfgRMIN_LO').value)||2;
+  CFG.RMIN_HI=parseFloat(document.getElementById('cfgRMIN_HI').value)||7;
+  CFG.RMIN_THR=parseFloat(document.getElementById('cfgRMIN_THR').value)||60;
+  CFG.CONF=parseFloat(document.getElementById('cfgCONF').value)||2000;
+  CFG.CANON_AGUA=parseFloat(document.getElementById('cfgCANON').value)||840;
+  CFG.TRANSPORTE=parseFloat(document.getElementById('cfgTRANSPORTE').value)||2;
+  CFG.ENRE=parseFloat(document.getElementById('cfgENRE').value)||(1658007/3);
+  Object.keys(MONTH_CFG).forEach(mk=>{
+    const tcEl=document.getElementById(`cfgTC_${mk}`);
+    const kpEl=document.getElementById(`cfgKP_${mk}`);
+    if(tcEl)MONTH_CFG[mk].TC=parseFloat(tcEl.value)||1200;
+    if(kpEl)MONTH_CFG[mk].KP=parseFloat(kpEl.value)||0.9;
+  });
+  const fraEl=document.getElementById('fml-fra');if(fraEl)fraEl.textContent=CFG.FRA;
+  updateFormulaPreview();
+  ['resumen','resumenUSD','potencia','remuneracion','costos'].forEach(id=>built.delete(id));
+  const cur=document.querySelector('.sec.active');
+  if(cur)buildSection(cur.id.replace('sec-',''));
+  showCfgSaved();
+}
+function showCfgSaved(){
+  const btn=document.getElementById('cfgApplyBtn');if(!btn)return;
+  btn.textContent='✓ Aplicado';btn.style.background='rgba(52,211,153,.25)';btn.style.color='var(--success)';
+  setTimeout(()=>{btn.textContent='Aplicar cambios';btn.style.background='';btn.style.color='';},1800);
+}
+function updateFormulaPreview(){
+  const el=document.getElementById('cfg-formula-preview');if(!el)return;
+  el.innerHTML=
+    `REM_Energía = CVP_TOTAL + MAX(RMIN ; (CMO×FP − CVP_TOTAL) × ${CFG.FRA})<br>`+
+    `<span>RMIN = ${CFG.RMIN_LO} si CVP_TOTAL &lt; ${CFG.RMIN_THR} | RMIN = ${CFG.RMIN_HI} si ≥ ${CFG.RMIN_THR}</span><br>`+
+    `<span>REM_Potencia (USD) = Σ POT_DISP_h × Kp × PPAD_h</span><br>`+
+    `<span>REM_Conf = Pot.Mes × ${CFG.CONF} USD × TC</span>`;
+}
+
+// ── MONTH STATE ────────────────────────────────────────────────────────────
+let MONTH=''; // set by initDashboard after load
+function switchMonth(){
+  MONTH=document.getElementById('monthSel').value;
+  document.getElementById('sidebar-sub').textContent=MONTH_META[MONTH].label;
+  document.getElementById('period-badge').textContent=MONTH_META[MONTH].badge;
+  built.clear();
+  const cur=document.querySelector('.sec.active');
+  if(cur)buildSection(cur.id.replace('sec-',''));
+}
+
+// ── DATA ACCESS ────────────────────────────────────────────────────────────
+const D=ALL_DATA; // ALL_DATA populated by loader
+const getRows=k=>D[MONTH]?.[k]?.rows||[];
+function allDates(keys){return[...new Set(keys.flatMap(k=>getRows(k).map(r=>r.fecha)))].sort();}
+
+// DD-MM format
+const fmtDate=d=>d.slice(8)+'-'+d.slice(5,7);
+
+function monthlyMWh(k){
+  let t=0;
+  getRows(k).forEach(r=>{if(r.h)r.h.forEach(v=>{t+=(v||0);});else t+=(r.avg||0)*24;});
+  return t;
+}
+function horasOperadas(k){
+  let n=0;
+  getRows(k).forEach(r=>{if(r.h)r.h.forEach(v=>{if((v||0)>0)n++;});else if((r.avg||0)>0)n+=24;});
+  return n;
+}
+function cvpAccum(priceKey,energyKey){
+  let total=0;
+  const eRows=getRows(energyKey),pRows=getRows(priceKey);
+  eRows.forEach(er=>{
+    const pr=pRows.find(x=>x.fecha===er.fecha);if(!pr)return;
+    const eh=er.h||Array(24).fill(er.avg||0);
+    const ph=pr.h||Array(24).fill(pr.avg||0);
+    for(let i=0;i<24;i++)total+=(eh[i]||0)*(ph[i]||0);
+  });
+  return total;
+}
+
+// ── MACHINE KEYS ─────────────────────────────────────────────────────────
+const MKEYS=['TG23','TG22','TV11','TV12'];
+const EKEYS={TG23:'AVALTG23-ENERGIA',TG22:'AVALTG22-ENERGIA',TV11:'AVALTV11-ENERGIA',TV12:'AVALTV12-ENERGIA'};
+const COMBKEYS={TG23:'AVALTG23-CVPCOMBREM-GX',TG22:'AVALTG22-CVPCOMBREM-GX',TV11:'AVALTV11-CVPCOMBREM-GX',TV12:'AVALTV12-CVPCOMBREM-GX'};
+const TRANSPKEYS={TG22:'AVALTG22-CVPTRANSPREMPROV-GX',TG23:'AVALTG23-CVPTRANSPREMPROV-GX'};
+const OYMKEYS={TG22:'AVALTG22-CVPOYMREM-GX',TG23:'AVALTG23-CVPOYMREM-GX'};
+const FPKEYS={TG23:'AVALTG23-FACTOR_PERDIDAS',TG22:'AVALTG22-FACTOR_PERDIDAS',TV11:'AVALTV11-FACTOR_PERDIDAS',TV12:'AVALTV12-FACTOR_PERDIDAS'};
+const POTKEYS={TG23:'AVALTG23-POT_DISP',TG22:'AVALTG22-POT_DISP',TV11:'AVALTV11-POT_DISP',TV12:'AVALTV12-POT_DISP'};
+
+// ── COMPUTED TOTALS ────────────────────────────────────────────────────────
+function getComputedTotals(){
+  const eMWh={};
+  MKEYS.forEach(m=>{eMWh[m]=monthlyMWh(EKEYS[m]);});
+  eMWh.TOTAL=MKEYS.reduce((s,m)=>s+eMWh[m],0);
+  const cvp={};
+  MKEYS.forEach(m=>{cvp['comb'+m]=cvpAccum(COMBKEYS[m],EKEYS[m]);});
+  cvp.combTotal=MKEYS.reduce((s,m)=>s+cvp['comb'+m],0);
+  ['TG22','TG23'].forEach(m=>{
+    cvp['transp'+m]=cvpAccum(TRANSPKEYS[m],EKEYS[m]);
+    cvp['oym'+m]=cvpAccum(OYMKEYS[m],EKEYS[m]);
+  });
+  cvp.transpTotal=(cvp.transpTG22||0)+(cvp.transpTG23||0);
+  cvp.oymTotal=(cvp.oymTG22||0)+(cvp.oymTG23||0);
+  cvp.TOTAL=cvp.combTotal+cvp.transpTotal+cvp.oymTotal;
+  return{eMWh,cvp};
+}
+
+// Remuneracion energía acumulada por máquina ($)
+function calcRemEnergia(){
+  const totals={};
+  MKEYS.forEach(m=>{
+    let sum=0;
+    allDates([EKEYS[m]]).forEach(fecha=>{
+      for(let h=0;h<24;h++){const r=calcRemHour(m,fecha,h);if(r)sum+=r.rem*r.e;}
+    });
+    totals[m]=sum;
+  });
+  totals.TOTAL=MKEYS.reduce((s,m)=>s+totals[m],0);
+  return totals;
+}
+
+// Remuneracion potencia = Σ POT_h * Kp * PPAD_h (USD)
+function calcRemPotencia(){
+  const ppadRows=getRows('PRECIOS-PPAD');
+  const kp=getKP();
+  let totalUSD=0;
+  const byMaq={};
+  MKEYS.forEach(m=>{
+    let mUSD=0;
+    getRows(POTKEYS[m]).forEach(er=>{
+      const pr=ppadRows.find(x=>x.fecha===er.fecha);if(!pr)return;
+      const ph=er.h||Array(24).fill(er.avg||0);
+      const pp=pr.h||Array(24).fill(null);
+      for(let i=0;i<24;i++){
+        const ppad_h=pp[i]??null;
+        if(ppad_h===null||ppad_h===0)continue;
+        mUSD+=(ph[i]||0)*kp*ppad_h;
+      }
+    });
+    byMaq[m]=mUSD;totalUSD+=mUSD;
+  });
+  byMaq.TOTAL=totalUSD;
+  return byMaq; // USD
+}
+
+// Potencia del mes = promedio horario de la SUMA de las 4 máquinas
+// = para cada hora: suma POT_DISP de cada máquina → luego promedio de todas las horas
+function calcPotMes(){
+  const dates=allDates(Object.values(POTKEYS));
+  let totalSum=0, cnt=0;
+  dates.forEach(fecha=>{
+    for(let h=0;h<24;h++){
+      let sumH=0, anyData=false;
+      MKEYS.forEach(m=>{
+        const r=getRows(POTKEYS[m]).find(x=>x.fecha===fecha);
+        if(!r)return;
+        const val=(r.h?r.h[h]:r.avg)||0;
+        sumH+=val; if(val>0)anyData=true;
+      });
+      if(anyData){totalSum+=sumH;cnt++;}
+    }
+  });
+  return cnt?totalSum/cnt:0;
+}
+
+// Costo Gas = (CVP_Comb_h + CVP_Transp_h) * Energia_h por máquina y hora
+function calcCostoGas(){
+  const byMaq={};
+  MKEYS.forEach(m=>{
+    let total=0;
+    const eRows=getRows(EKEYS[m]);
+    const cRows=getRows(COMBKEYS[m]);
+    const tKey=TRANSPKEYS[m]; const tRows=tKey?getRows(tKey):[];
+    eRows.forEach(er=>{
+      const cr=cRows.find(x=>x.fecha===er.fecha);
+      const tr=tRows.find?.(x=>x.fecha===er.fecha);
+      const eh=er.h||Array(24).fill(er.avg||0);
+      const ch=cr?.h||Array(24).fill(cr?.avg||0);
+      const th=tr?.h||Array(24).fill(tr?.avg||0);
+      for(let i=0;i<24;i++){
+        const e=eh[i]||0;
+        const costo=((ch[i]||0)+(th[i]||0))*e;
+        total+=costo;
+      }
+    });
+    byMaq[m]=total;
+  });
+  byMaq.TOTAL=MKEYS.reduce((s,m)=>s+(byMaq[m]||0),0);
+  return byMaq; // $
+}
+
+// Daily costo gas totals for chart
+function calcCostoGasDaily(){
+  const dates=allDates(Object.values(EKEYS));
+  return dates.map(fecha=>{
+    let day=0;
+    MKEYS.forEach(m=>{
+      const er=getRows(EKEYS[m]).find(x=>x.fecha===fecha);
+      const cr=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
+      const tKey=TRANSPKEYS[m];
+      const tr=tKey?getRows(tKey).find(x=>x.fecha===fecha):null;
+      if(!er)return;
+      const eh=er.h||Array(24).fill(er.avg||0);
+      const ch=cr?.h||Array(24).fill(cr?.avg||0);
+      const th=tr?.h||Array(24).fill(tr?.avg||0);
+      for(let i=0;i<24;i++) day+=((ch[i]||0)+(th[i]||0))*(eh[i]||0);
+    });
+    return{fecha,val:day};
+  }).filter(x=>x.val>0);
+}
+
+// RPF remuneracion (en $)
+// Por hora: PRECIO_RPF_h * AVG(PORC_RPF de las 4 máquinas)_h / 100 * SUMA(Energia_h de las 4 máquinas)
+const RPFPORCKEYS={
+  TG23:'AVALTG23-RPF_GEN-PORC_RPF',TG22:'AVALTG22-RPF_GEN-PORC_RPF',
+  TV11:'AVALTV11-RPF_GEN-PORC_RPF',TV12:'AVALTV12-RPF_GEN-PORC_RPF',
+};
+function calcRPF(){
+  const precioRows=getRows('RPF-PRECIO_RPF');
+  let total=0;
+  const dates=allDates(Object.values(EKEYS));
+  dates.forEach(fecha=>{
+    const pr=precioRows.find(x=>x.fecha===fecha);
+    if(!pr)return;
+    const precioH=pr.h||Array(24).fill(pr.avg||0);
+    for(let h=0;h<24;h++){
+      const precio_h=precioH[h]||0;
+      if(!precio_h)continue;
+      // avg PORC_RPF across machines (use 0 if null)
+      let sumPorc=0;
+      MKEYS.forEach(m=>{
+        const rr=getRows(RPFPORCKEYS[m]).find(x=>x.fecha===fecha);
+        const ph=rr?.h||Array(24).fill(rr?.avg||0);
+        sumPorc+=(ph[h]||0);
+      });
+      const avgPorc=sumPorc/4;
+      // sum energia across machines
+      let sumE=0;
+      MKEYS.forEach(m=>{
+        const er=getRows(EKEYS[m]).find(x=>x.fecha===fecha);
+        const eh=er?.h||Array(24).fill(er?.avg||0);
+        sumE+=(eh[h]||0);
+      });
+      total+=precio_h*(avgPorc/100)*sumE;
+    }
+  });
+  return total; // $
+}
+
+// POT total by date (MW·h per day)
+function potTotalByDate(){
+  const dates=allDates(Object.values(POTKEYS));
+  return dates.map(fecha=>{
+    let mwh=0,avgMW=0;
+    MKEYS.forEach(m=>{
+      const r=getRows(POTKEYS[m]).find(x=>x.fecha===fecha);
+      if(r){if(r.h)r.h.forEach(v=>{mwh+=(v||0);});else mwh+=(r.avg||0)*24;avgMW+=(r.avg||0);}
+    });
+    return{fecha,mwh,avgMW};
+  });
+}
+
+// ── REM HORA ─────────────────────────────────────────────────────────────
+function calcRemHour(m,fecha,h){
+  const eRow=getRows(EKEYS[m]).find(x=>x.fecha===fecha);
+  const e=(eRow?.h?eRow.h[h]:eRow?.avg)||0;
+  if(!e||e<=0)return null;
+  const comb=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
+  const combV=comb?.h?comb.h[h]??comb.avg:comb?.avg??0;
+  const transpKey=TRANSPKEYS[m];let transpV=0;
+  if(transpKey){const tr=getRows(transpKey).find(x=>x.fecha===fecha);transpV=tr?.h?tr.h[h]??tr.avg:tr?.avg??0;}
+  const oymKey=OYMKEYS[m];let oymV=0;
+  if(oymKey){const oy=getRows(oymKey).find(x=>x.fecha===fecha);oymV=oy?.h?oy.h[h]??oy.avg:oy?.avg??0;}
+  const cvpTotal=(combV||0)+(transpV||0)+(oymV||0);
+  const cmoRow=getRows('PRECIOS-CMO').find(x=>x.fecha===fecha);
+  const cmo=cmoRow?.h?cmoRow.h[h]??cmoRow.avg:cmoRow?.avg??0;
+  const fpRow=getRows(FPKEYS[m]).find(x=>x.fecha===fecha);
+  const fp=fpRow?.h?fpRow.h[h]??fpRow.avg:fpRow?.avg??1;
+  const cmoFP=(cmo||0)*(fp||1);
+  const RMIN=cvpTotal<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
+  const rem=cvpTotal+Math.max(RMIN,(cmoFP-cvpTotal)*CFG.FRA);
+  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,rem};
+}
+function calcRemDaily(m){
+  return allDates([EKEYS[m]]).map(fecha=>{
+    let sumRem=0,sumE=0,sumCvp=0,sumComb=0,sumTransp=0,sumOym=0;
+    for(let h=0;h<24;h++){
+      const r=calcRemHour(m,fecha,h);
+      if(!r)continue;
+      sumRem+=r.rem*r.e;sumE+=r.e;sumCvp+=r.cvpTotal*r.e;
+      sumComb+=r.comb*r.e;sumTransp+=r.transp*r.e;sumOym+=r.oym*r.e;
+    }
+    if(!sumE)return{fecha,remAvg:0,cvpAvg:0,combAvg:0,transpAvg:0,oymAvg:0,E:0};
+    return{fecha,remAvg:sumRem/sumE,cvpAvg:sumCvp/sumE,combAvg:sumComb/sumE,transpAvg:sumTransp/sumE,oymAvg:sumOym/sumE,E:sumE,remTotal:sumRem};
+  }).filter(x=>x.E>0);
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+const CL=['#4f8ef7','#2dd4bf','#fb923c','#a78bfa','#f472b6','#34d399','#fbbf24'];
+const GR={color:'rgba(255,255,255,0.06)'};
+const TK={color:'#7a8099',font:{size:11}};
+// All digits, no decimals, thousands separator
+const fmtN=(n,d=0)=>n==null?'—':n.toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtFull=n=>n==null||isNaN(n)?'—':Math.round(n).toLocaleString('es-AR');
+// Compact for charts/small spaces
+const fmtK=n=>{if(n==null||isNaN(n))return'—';const a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);};
+function lerpColor(v,mn,mx){if(mx===mn)return'rgba(79,142,247,0.3)';const t=(v-mn)/(mx-mn);if(t<0.33)return`rgba(45,212,191,${0.2+t*1.5})`;if(t<0.66)return`rgba(251,191,36,${0.4+t})`;return`rgba(248,113,113,${0.5+t*0.5})`;}
+let charts={};
+function mkChart(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);}
+
+// Common chart options
+const legendOpts={display:true,position:'bottom',labels:{color:'#7a8099',font:{size:11},boxWidth:10,boxHeight:10,padding:12}};
+
+// ── SECTION NAV ────────────────────────────────────────────────────────────
+const SMETA={
+  resumen:{title:'Resumen general',sub:'Acumulados del mes'},
+  resumenUSD:{title:'Resumen en USD',sub:'Tipo de cambio configurable'},
+  energia:{title:'Energía asignada',sub:'MWh por activo'},
+  cmo:{title:'CMO — Costo Marginal Operado',sub:'$/MWh'},
+  combrem:{title:'CVP Costo Combustible Rem.',sub:'$/MWh'},
+  transpprov:{title:'CVP Transporte Combustible Provisto',sub:'$/MWh'},
+  oym:{title:'CVP O&M Remuneración',sub:'$/MWh'},
+  costos:{title:'Costos',sub:'Costo Gas por máquina'},
+  potencia:{title:'Potencia disponible',sub:'MW por máquina · PPAD en USD/MW'},
+  remuneracion:{title:'Remuneración',sub:'Por máquina y total'},
+  heatmap:{title:'Perfil horario',sub:'Distribución hora por día'},
+  config:{title:'Configuración',sub:'Parámetros del modelo'},
+};
+function showSec(id){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.querySelectorAll('.ni').forEach(n=>{if(n.getAttribute('onclick')===`showSec('${id}')`)n.classList.add('active');});
+  document.getElementById('page-title').innerHTML=SMETA[id].title;
+  document.getElementById('page-sub').textContent=SMETA[id].sub;
+  buildSection(id);
+}
+const built=new Set();
+function buildSection(id){
+  if(built.has(id))return;built.add(id);
+  ({resumen:buildResumen,resumenUSD:buildResumenUSD,energia:buildEnergia,cmo:buildCmo,
+    combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,
+    costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,
+    heatmap:buildHeatmap,config:buildConfig})[id]?.();
+}
+
+// ── RESUMEN ARS ────────────────────────────────────────────────────────────
+function mkResumenTable(rows){
+  return `<table style="border-collapse:collapse;font-size:13px;width:auto">
+    <tbody>${rows.map(r=>{
+      const isTotal=r.sep||r.b;
+      const valStyle=r.color?`color:${r.color}`:(isTotal?'color:var(--accent)':'color:var(--text)');
+      const labelStyle=r.sep?'color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px':'';
+      return r.sep
+        ? `<tr><td colspan="3" style="${labelStyle};padding:10px 0 2px;font-family:var(--body)">${r.label}</td></tr>`
+        : `<tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:${r.b?'var(--text)':'var(--muted)'};font-weight:${r.b?600:400};white-space:nowrap">${r.label}</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:${r.b?'14px':'13px'};font-weight:${r.b?700:400};text-align:right;${valStyle}">${r.val}</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">${r.unit||''}</td>
+          </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function buildResumen(){
+  const {eMWh}=getComputedTotals();
+  const remE=calcRemEnergia();
+  const remP=calcRemPotencia();
+  const potMes=calcPotMes();
+  const tc=getTC();
+  const remConf=potMes*CFG.CONF*tc;
+  const remRPF=calcRPF();
+  const costoGas=calcCostoGas();
+  const remGrand=remE.TOTAL+remP.TOTAL*tc+remConf+remRPF;
+
+  // Costos adicionales
+  const canonAgua=eMWh.TOTAL*CFG.CANON_AGUA;
+  const transporte=CFG.TRANSPORTE;
+  const enre=CFG.ENRE;
+  const cammesa=0.0004*remGrand;
+  const impDebCred=(0.006*(remGrand-enre))+(0.006*(canonAgua+transporte));
+  const totalCostos=costoGas.TOTAL+canonAgua+transporte+enre+cammesa+impDebCred;
+  const netTotal=remGrand-totalCostos;
+
+  const kpiRows=[
+    {sep:true,label:'Producción'},
+    {label:'Energía generada',val:fmtFull(eMWh.TOTAL),unit:'MWh'},
+    {label:'Potencia del mes',val:fmtN(potMes,2),unit:'MW'},
+    {sep:true,label:'Remuneraciones'},
+    {label:'Rem. Energía',       val:'$ '+fmtFull(remE.TOTAL),             unit:'',  color:'var(--purple)'},
+    {label:'Rem. Potencia',      val:'$ '+fmtFull(remP.TOTAL*tc),          unit:'(USD '+fmtFull(remP.TOTAL)+')', color:'var(--teal)'},
+    {label:'Confiabilidad',      val:'$ '+fmtFull(remConf),                unit:'',  color:'var(--warn)'},
+    {label:'RPF',                val:'$ '+fmtFull(remRPF),                 unit:'',  color:'var(--danger)'},
+    {label:'Total Remuneraciones',val:'$ '+fmtFull(remGrand),              unit:'',  b:true, color:'var(--accent)'},
+    {sep:true,label:'Costos'},
+    {label:'Costo Gas',          val:'$ '+fmtFull(costoGas.TOTAL),         unit:'',  color:'var(--danger)'},
+    {label:'Canon del Agua',     val:'$ '+fmtFull(canonAgua),              unit:'('+fmtFull(eMWh.TOTAL)+' MWh × $'+CFG.CANON_AGUA+')', color:'var(--danger)'},
+    {label:'Transporte',         val:'$ '+fmtFull(transporte),             unit:'',  color:'var(--danger)'},
+    {label:'ENRE',               val:'$ '+fmtN(enre,2),                   unit:'',  color:'var(--danger)'},
+    {label:'CAMMESA',            val:'$ '+fmtFull(cammesa),                unit:'(0,04% × Total Rem.)', color:'var(--danger)'},
+    {label:'Imp. Déb/Cred',      val:'$ '+fmtFull(impDebCred),             unit:'',  color:'var(--danger)'},
+    {label:'Total Costos',       val:'$ '+fmtFull(totalCostos),            unit:'',  b:true, color:'var(--danger)'},
+    {sep:true,label:'Resultado'},
+    {label:'Rem. − Costos',      val:'$ '+fmtFull(netTotal),               unit:'',  b:true, color:netTotal>=0?'var(--success)':'var(--danger)'},
+  ];
+  document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
+  document.getElementById('tbl-resumen-tc').innerHTML=mkResumenTable([
+    {label:'Tipo de cambio',val:'$ '+fmtN(tc,4),unit:'ARS/USD'},
+  ]);
+  _buildResumenCharts('cEnergiaRes',null,'cCmoRes');
+}
+
+function _buildResumenCharts(eChartId,_legId,cmoChartId,usdMode){
+  const tc=usdMode?getTC():null;
+  const dates=allDates(Object.values(EKEYS));
+  const ds=MKEYS.map((m,i)=>({label:m,data:dates.map(d=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
+  const totData=dates.map(d=>{let s=0;MKEYS.forEach(m=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);if(r)s+=r.avg||0;});return s;});
+  ds.push({label:'TOTAL',data:totData,borderColor:'#fff',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:2,borderDash:[4,3],spanGaps:true});
+  mkChart(eChartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:12}},y:{grid:GR,ticks:TK}}}});
+  const cmoR=getRows('PRECIOS-CMO');
+  const cmoData=tc?cmoR.map(r=>r.avg/tc):cmoR.map(r=>r.avg);
+  const cmoLabel=tc?'CMO USD/MWh':'CMO $/MWh';
+  const cmoFmt=tc?v=>'USD '+fmtK(v):v=>'$'+fmtK(v);
+  mkChart(cmoChartId,{type:'line',data:{labels:cmoR.map(r=>fmtDate(r.fecha)),datasets:[{label:cmoLabel,data:cmoData,borderColor:'#fbbf24',backgroundColor:'#fbbf2422',fill:true,tension:0.3,pointRadius:2,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:cmoFmt}}}}});
+}
+
+// ── RESUMEN USD ────────────────────────────────────────────────────────────
+function buildResumenUSD(){_renderResumenUSD();}
+function rebuildUSD(){_renderResumenUSD();}
+function _renderResumenUSD(){
+  const {eMWh}=getComputedTotals();
+  const remE=calcRemEnergia();
+  const remP=calcRemPotencia();
+  const potMes=calcPotMes();
+  const tc=getTC();
+  const toU=v=>v/tc;
+
+  const remConf=potMes*CFG.CONF;                          // USD
+  const remRPF_usd=toU(calcRPF());                        // USD
+  const costoGas_usd=toU(calcCostoGas().TOTAL);           // USD
+
+  const remGrand_usd=toU(remE.TOTAL)+remP.TOTAL+remConf+remRPF_usd;
+
+  const canonAgua_usd=toU(eMWh.TOTAL*CFG.CANON_AGUA);
+  const transporte_usd=toU(CFG.TRANSPORTE);
+  const enre_usd=toU(CFG.ENRE);
+  const cammesa_usd=0.0004*remGrand_usd;
+  const impDebCred_usd=(0.006*(remGrand_usd-enre_usd))+(0.006*(canonAgua_usd+transporte_usd));
+  const totalCostos_usd=costoGas_usd+canonAgua_usd+transporte_usd+enre_usd+cammesa_usd+impDebCred_usd;
+  const net_usd=remGrand_usd-totalCostos_usd;
+
+  const u='USD ';
+  const kpiRows=[
+    {sep:true,label:'Producción'},
+    {label:'Energía generada',    val:fmtFull(eMWh.TOTAL),                   unit:'MWh'},
+    {label:'Potencia del mes',    val:fmtN(potMes,2),                         unit:'MW'},
+    {sep:true,label:'Remuneraciones'},
+    {label:'Rem. Energía',        val:u+fmtFull(toU(remE.TOTAL)),             unit:'', color:'var(--purple)'},
+    {label:'Rem. Potencia',       val:u+fmtFull(remP.TOTAL),                  unit:'($ '+fmtFull(remP.TOTAL*tc)+')', color:'var(--teal)'},
+    {label:'Confiabilidad',       val:u+fmtFull(remConf),                     unit:'', color:'var(--warn)'},
+    {label:'RPF',                 val:u+fmtFull(remRPF_usd),                  unit:'', color:'var(--danger)'},
+    {label:'Total Remuneraciones',val:u+fmtFull(remGrand_usd),                unit:'', b:true, color:'var(--accent)'},
+    {sep:true,label:'Costos'},
+    {label:'Costo Gas',           val:u+fmtFull(costoGas_usd),                unit:'', color:'var(--danger)'},
+    {label:'Canon del Agua',      val:u+fmtFull(canonAgua_usd),               unit:'('+fmtFull(eMWh.TOTAL)+' MWh × USD '+fmtN(CFG.CANON_AGUA/tc,2)+')', color:'var(--danger)'},
+    {label:'Transporte',          val:u+fmtN(transporte_usd,2),               unit:'', color:'var(--danger)'},
+    {label:'ENRE',                val:u+fmtN(enre_usd,2),                     unit:'', color:'var(--danger)'},
+    {label:'CAMMESA',             val:u+fmtFull(cammesa_usd),                 unit:'(0,04% × Total Rem.)', color:'var(--danger)'},
+    {label:'Imp. Déb/Cred',       val:u+fmtFull(impDebCred_usd),              unit:'', color:'var(--danger)'},
+    {label:'Total Costos',        val:u+fmtFull(totalCostos_usd),             unit:'', b:true, color:'var(--danger)'},
+    {sep:true,label:'Resultado'},
+    {label:'Rem. − Costos',       val:u+fmtFull(net_usd),                     unit:'', b:true, color:net_usd>=0?'var(--success)':'var(--danger)'},
+  ];
+  document.getElementById('tbl-resumenUSD-kpi').innerHTML=mkResumenTable(kpiRows);
+  document.getElementById('tbl-resumenUSD-tc').innerHTML=mkResumenTable([
+    {label:'Tipo de cambio',val:'$ '+fmtN(tc,4),unit:'ARS/USD'},
+  ]);
+  _buildResumenCharts('cEnergiaResUSD',null,'cCmoResUSD',true);
+}
+
+// ── ENERGÍA ────────────────────────────────────────────────────────────────
+let eActive=0;
+function buildEnergia(){
+  const horas=MKEYS.map(m=>horasOperadas(EKEYS[m]));
+  document.getElementById('kpi-energia').innerHTML=MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} — acumulado</div><div class="kpi-val" style="color:${CL[i]}">${fmtFull(monthlyMWh(EKEYS[m]))}</div><div class="kpi-unit">MWh · ${horas[i]}hs op.</div></div>`).join('')+
+    `<div class="kpi" style="border-color:rgba(79,142,247,.35)"><div class="kpi-lbl">TOTAL</div><div class="kpi-val a">${fmtFull(MKEYS.reduce((s,m)=>s+monthlyMWh(EKEYS[m]),0))}</div><div class="kpi-unit">MWh mes</div></div>`;
+  document.getElementById('tabs-energia').innerHTML=MKEYS.map((m,i)=>`<button class="tab ${i===eActive?'active':''}" onclick="setETab(${i})">${m}</button>`).join('')+'<button class="tab" onclick="setETab(-1)">Todos</button>';
+  renderEChart();
+}
+function setETab(i){eActive=i;document.querySelectorAll('#tabs-energia .tab').forEach((t,j)=>t.classList.toggle('active',j===i||(i===-1&&j===4)));renderEChart();}
+function renderEChart(){
+  const dates=allDates(Object.values(EKEYS));
+  let ds,lbls;
+  if(eActive===-1){
+    ds=MKEYS.map((m,i)=>({label:m,data:dates.map(d=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
+    const tot=dates.map(d=>{let s=0;MKEYS.forEach(m=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);if(r)s+=r.avg||0;});return s;});
+    ds.push({label:'TOTAL',data:tot,borderColor:'#fff',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:2.5,borderDash:[5,3]});
+    lbls=dates.map(fmtDate);document.getElementById('eChartTitle').textContent='Energía — todos + total';
+  } else {
+    const m=MKEYS[eActive];const rows=getRows(EKEYS[m]);
+    ds=[{label:`Energía ${m} (MWh)`,data:rows.map(r=>r.avg),borderColor:CL[eActive],backgroundColor:CL[eActive]+'33',fill:true,tension:0.3,pointRadius:3,borderWidth:2}];
+    lbls=rows.map(r=>fmtDate(r.fecha));document.getElementById('eChartTitle').textContent=`Energía ${m}`;
+  }
+  mkChart('cEnergiaDetail',{type:'line',data:{labels:lbls,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:14}},y:{grid:GR,ticks:TK}}}});
+}
+
+// ── CMO ────────────────────────────────────────────────────────────────────
+function buildCmo(){
+  const rows=getRows('PRECIOS-CMO');
+  const avgs=rows.map(r=>r.avg),mn=Math.min(...avgs),mx=Math.max(...avgs);
+  const last=avgs[avgs.length-1],prev=avgs.length>1?avgs[avgs.length-2]:last;
+  const delta=((last-prev)/prev*100).toFixed(1),up=last>=prev;
+  document.getElementById('kpi-cmo').innerHTML=`
+    <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtK(last)}</div><div class="kpi-unit">$/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
+    <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtK(mn)}</div><div class="kpi-unit">$/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtK(mx)}</div><div class="kpi-unit">$/MWh</div></div>`;
+  mkChart('cCmoFull',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO $/MWh',data:avgs,borderColor:'#fbbf24',backgroundColor:'#fbbf2415',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+}
+
+// ── GENERIC CVP ────────────────────────────────────────────────────────────
+function buildCvpSection(secId,keys,labels,chartId,titleId,tblDbgId,tabsId){
+  let active=0;
+  function render(a){
+    if(a===-1){
+      const dates=allDates(keys);
+      const ds=keys.map((k,i)=>({label:labels[i],data:dates.map(d=>{const r=getRows(k).find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
+      mkChart(chartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+      document.getElementById(titleId).textContent='CVP — todos';
+      if(tblDbgId)document.getElementById(tblDbgId).innerHTML='<tr><td style="color:var(--muted);padding:12px">Seleccioná una máquina para ver el detalle horario.</td></tr>';
+    } else {
+      const k=keys[a];const rows=getRows(k);const col=CL[a];
+      mkChart(chartId,{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:`${labels[a]} $/MWh`,data:rows.map(r=>r.avg),borderColor:col,backgroundColor:col+'22',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+      document.getElementById(titleId).textContent=`CVP — ${labels[a]}`;
+      if(tblDbgId)buildDbgTable(tblDbgId,k);
+    }
+  }
+  const fnName='cvpRender_'+secId;
+  window[fnName]=a=>{active=a;document.querySelectorAll(`#${tabsId} .tab`).forEach((t,j)=>t.classList.toggle('active',j===a||(a===-1&&j===labels.length)));render(a);};
+  document.getElementById(tabsId).innerHTML=labels.map((l,i)=>`<button class="tab ${i===0?'active':''}" onclick="${fnName}(${i})">${l}</button>`).join('')+`<button class="tab" onclick="${fnName}(-1)">Todos</button>`;
+  render(0);
+}
+function buildDbgTable(tblId,sheetKey){
+  const rows=getRows(sheetKey);if(!rows.length){document.getElementById(tblId).innerHTML='';return;}
+  let html=`<thead><tr><th>Fecha</th>${Array.from({length:24},(_,i)=>`<th>${i+1}</th>`).join('')}<th>avg</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    html+=`<tr><td class="rl">${fmtDate(r.fecha)}</td>`;
+    (r.h||Array(24).fill(r.avg)).forEach(v=>{html+=`<td title="${v!=null?fmtN(v,0):''}" style="${v&&v>0?'background:rgba(79,142,247,0.15)':''}">${v&&v>0?fmtK(v):''}</td>`;});
+    html+=`<td style="color:var(--accent)">${fmtK(r.avg)}</td></tr>`;
+  });
+  document.getElementById(tblId).innerHTML=html+'</tbody>';
+}
+function buildCombrem(){
+  const {cvp}=getComputedTotals();
+  document.getElementById('kpi-combrem').innerHTML=MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} acumulado</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(cvp['comb'+m])}</div><div class="kpi-unit">$ mes</div></div>`).join('')+
+    `<div class="kpi" style="border-color:rgba(79,142,247,.35)"><div class="kpi-lbl">TOTAL</div><div class="kpi-val d">${fmtK(cvp.combTotal)}</div><div class="kpi-unit">$ mes</div></div>`;
+  buildCvpSection('combrem',['AVALTG23-CVPCOMBREM-GX','AVALTG22-CVPCOMBREM-GX','AVALTV11-CVPCOMBREM-GX','AVALTV12-CVPCOMBREM-GX'],['TG23','TG22','TV11','TV12'],'cCombRem','combremTitle','tbl-combrem-dbg','tabs-combrem');
+}
+function buildTranspProv(){
+  const {cvp}=getComputedTotals();
+  document.getElementById('kpi-transpprov').innerHTML=['TG22','TG23'].map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} acumulado</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(cvp['transp'+m])}</div><div class="kpi-unit">$ mes</div></div>`).join('')+
+    `<div class="kpi" style="border-color:rgba(79,142,247,.35)"><div class="kpi-lbl">TOTAL</div><div class="kpi-val a">${fmtK(cvp.transpTotal)}</div><div class="kpi-unit">$ mes</div></div>`;
+  buildCvpSection('transpprov',['AVALTG22-CVPTRANSPREMPROV-GX','AVALTG23-CVPTRANSPREMPROV-GX'],['TG22','TG23'],'cTranspProv','transpTitle','tbl-transp-dbg','tabs-transpprov');
+}
+function buildOym(){
+  const {cvp}=getComputedTotals();
+  document.getElementById('kpi-oym').innerHTML=['TG22','TG23'].map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} acumulado</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(cvp['oym'+m])}</div><div class="kpi-unit">$ mes</div></div>`).join('')+
+    `<div class="kpi" style="border-color:rgba(79,142,247,.35)"><div class="kpi-lbl">TOTAL</div><div class="kpi-val a">${fmtK(cvp.oymTotal)}</div><div class="kpi-unit">$ mes</div></div>`;
+  buildCvpSection('oym',['AVALTG22-CVPOYMREM-GX','AVALTG23-CVPOYMREM-GX'],['TG22','TG23'],'cOym','oymTitle','tbl-oym-dbg','tabs-oym');
+}
+
+// ── POTENCIA ───────────────────────────────────────────────────────────────
+let potDbgActive=0;
+function buildPotencia(){
+  const remP=calcRemPotencia();
+  const mwhPerMaq=MKEYS.map(m=>{let t=0;getRows(POTKEYS[m]).forEach(r=>{if(r.h)r.h.forEach(v=>{t+=(v||0);});else t+=(r.avg||0)*24;});return t;});
+  const totalMWh=mwhPerMaq.reduce((s,v)=>s+v,0);
+  const potMes=calcPotMes();
+  const tc=getTC();
+  document.getElementById('kpi-pot').innerHTML=
+    MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} — pot. acum.</div><div class="kpi-val" style="color:${CL[i]}">${fmtFull(mwhPerMaq[i])}</div><div class="kpi-unit">MW·h mes</div></div>`).join('')+
+    `<div class="kpi" style="border-color:rgba(45,212,191,.4)"><div class="kpi-lbl">POT TOTAL MW·h</div><div class="kpi-val" style="color:var(--teal)">${fmtFull(totalMWh)}</div><div class="kpi-unit">MW·h mes</div></div>`+
+    `<div class="kpi" style="border-color:rgba(79,142,247,.4)"><div class="kpi-lbl">Potencia del mes</div><div class="kpi-val a">${fmtN(potMes,2)}</div><div class="kpi-unit">MW · promedio 4 máquinas</div></div>`+
+    `<div class="kpi" style="border-color:rgba(167,139,250,.4)"><div class="kpi-lbl">Rem. potencia TOTAL</div><div class="kpi-val p">${fmtFull(remP.TOTAL)}</div><div class="kpi-unit">USD (Kp=${getKP()})</div></div>`;
+  // Potencia chart (separate from energía)
+  const dates=allDates(Object.values(POTKEYS));
+  const ds=MKEYS.map((m,i)=>({label:`${m} POT_DISP (MW)`,data:dates.map(d=>{const r=getRows(POTKEYS[m]).find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
+  const totLine=dates.map(d=>{let s=0;MKEYS.forEach(m=>{const r=getRows(POTKEYS[m]).find(x=>x.fecha===d);if(r)s+=r.avg||0;});return s;});
+  ds.push({label:'TOTAL (MW)',data:totLine,borderColor:'#fff',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:2.5,borderDash:[5,3]});
+  // PPAD line on secondary axis
+  const ppadRows=getRows('PRECIOS-PPAD');
+  ds.push({label:'PPAD (USD/MW)',data:dates.map(d=>{const r=ppadRows.find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:'#fbbf24',backgroundColor:'transparent',fill:false,tension:0,pointRadius:3,borderWidth:1.5,borderDash:[2,2],yAxisID:'y2',spanGaps:true});
+  mkChart('cPotLine',{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:14}},y:{grid:GR,ticks:TK,title:{display:true,text:'MW',color:'#7a8099',font:{size:10}}},y2:{position:'right',grid:{display:false},ticks:{...TK,color:'#fbbf24'},title:{display:true,text:'USD/MW',color:'#fbbf24',font:{size:10}}}}}});
+  // Table
+  const potByDate=potTotalByDate();
+  const ppadByDate=Object.fromEntries(ppadRows.map(r=>[r.fecha,r]));
+  document.getElementById('tbl-pot').innerHTML=`<thead><tr><th>Fecha</th>${MKEYS.map(m=>`<th class="num">${m} MW</th>`).join('')}<th class="num">Total MW</th><th class="num">MW·h día</th><th class="num">PPAD avg</th><th class="num">Rem. pot. USD</th></tr></thead><tbody>${
+    potByDate.map(x=>{
+      const perMaq=MKEYS.map(m=>{const r=getRows(POTKEYS[m]).find(rr=>rr.fecha===x.fecha);return r?r.avg||0:0;});
+      // daily rem from PPAD hourly
+      let dayRemUSD=0;
+      MKEYS.forEach(m=>{
+        const pr=getRows(POTKEYS[m]).find(rr=>rr.fecha===x.fecha);
+        const pp=ppadByDate[x.fecha];
+        if(!pr||!pp)return;
+        const ph=pr.h||Array(24).fill(pr.avg||0);
+        const ppH=pp.h||Array(24).fill(null);
+        for(let i=0;i<24;i++){const pv=ppH[i]??null;if(pv!==null&&pv>0)dayRemUSD+=(ph[i]||0)*getKP()*pv;}
+      });
+      const ppadAvg=ppadByDate[x.fecha]?.avg??0;
+      return `<tr><td class="lbl">${fmtDate(x.fecha)}</td>${perMaq.map(v=>`<td class="num">${fmtN(v,2)}</td>`).join('')}<td class="num">${fmtN(x.avgMW,2)}</td><td class="num">${fmtFull(x.mwh)}</td><td class="num" style="color:var(--warn)">${ppadAvg||'—'}</td><td class="num" style="color:var(--purple)">${fmtFull(dayRemUSD)}</td></tr>`;
+    }).join('')}</tbody>`;
+  // Debug tabs
+  document.getElementById('stabs-pot').innerHTML=MKEYS.map((m,i)=>`<button class="stab ${i===potDbgActive?'active':''}" onclick="setPotDbgTab(${i})">${m}</button>`).join('')+`<button class="stab ${potDbgActive===4?'active':''}" onclick="setPotDbgTab(4)">TOTAL</button>`;
+  renderPotDbg();
+}
+function setPotDbgTab(i){potDbgActive=i;document.querySelectorAll('#stabs-pot .stab').forEach((t,j)=>t.classList.toggle('active',j===i));renderPotDbg();}
+function renderPotDbg(){
+  let rows;
+  if(potDbgActive<4){rows=getRows(POTKEYS[MKEYS[potDbgActive]]);}
+  else{
+    const dates=allDates(Object.values(POTKEYS));
+    rows=dates.map(fecha=>{
+      const h=Array(24).fill(0);
+      MKEYS.forEach(m=>{const r=getRows(POTKEYS[m]).find(x=>x.fecha===fecha);if(r){if(r.h)r.h.forEach((v,i)=>{h[i]+=(v||0);});else h.forEach((_,i)=>h[i]+=(r.avg||0));}});
+      return{fecha,h,avg:h.reduce((s,v)=>s+v,0)/24};
+    });
+  }
+  if(!rows.length){document.getElementById('tbl-pot-dbg').innerHTML='';return;}
+  const allV=rows.flatMap(r=>(r.h||[]).filter(v=>v>0));
+  const mn=allV.length?Math.min(...allV):0,mx=allV.length?Math.max(...allV):1;
+  let html=`<thead><tr><th>${MKEYS[potDbgActive]||'TOTAL'}</th>${Array.from({length:24},(_,i)=>`<th>${i+1}</th>`).join('')}<th>avg</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    html+=`<tr><td class="rl">${fmtDate(r.fecha)}</td>`;
+    (r.h||Array(24).fill(r.avg)).forEach(v=>{html+=v>0?`<td title="${fmtN(v,2)}" style="background:${lerpColor(v,mn,mx)}">${fmtN(v,1)}</td>`:`<td></td>`;});
+    html+=`<td style="color:var(--teal)">${fmtN(r.avg,2)}</td></tr>`;
+  });
+  document.getElementById('tbl-pot-dbg').innerHTML=html+'</tbody>';
+}
+
+// ── REMUNERACIÓN ─────────────────────────────────────────────────────────
+const REM_MAQUINAS=[...MKEYS,'TOTAL'];
+let remActive=0;
+function buildRemuneracion(){
+  const totals={};
+  MKEYS.forEach(m=>{
+    let sum=0;
+    allDates([EKEYS[m]]).forEach(fecha=>{for(let h=0;h<24;h++){const r=calcRemHour(m,fecha,h);if(r)sum+=r.rem*r.e;}});
+    totals[m]=sum;
+  });
+  totals.TOTAL=MKEYS.reduce((s,m)=>s+totals[m],0);
+  const remP=calcRemPotencia();
+  const potMes=calcPotMes();
+  const tc=getTC();
+  const remConf=potMes*CFG.CONF*tc;
+  const remRPF=calcRPF();
+  const remGrand=totals.TOTAL+remP.TOTAL*tc+remConf+remRPF;
+  document.getElementById('kpi-rem').innerHTML=
+    MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} — rem. energía</div><div class="kpi-val" style="color:${CL[i]}">${fmtFull(totals[m])}</div><div class="kpi-unit">$</div></div>`).join('')+
+    `<div class="kpi"><div class="kpi-lbl">Rem. Energía TOTAL</div><div class="kpi-val p">${fmtFull(totals.TOTAL)}</div><div class="kpi-unit">$</div></div>`+
+    `<div class="kpi"><div class="kpi-lbl">Rem. Potencia TOTAL</div><div class="kpi-val" style="color:var(--teal)">${fmtFull(remP.TOTAL)}</div><div class="kpi-unit">USD · = $${fmtFull(remP.TOTAL*tc)}</div></div>`+
+    `<div class="kpi"><div class="kpi-lbl">Confiabilidad</div><div class="kpi-val w">${fmtFull(remConf)}</div><div class="kpi-unit">$</div></div>`+
+    `<div class="kpi"><div class="kpi-lbl">RPF</div><div class="kpi-val d">${fmtFull(remRPF)}</div><div class="kpi-unit">$</div></div>`+
+    `<div class="kpi" style="border-color:rgba(167,139,250,.5)"><div class="kpi-lbl">REM TOTAL (E+Pot+Conf+RPF)</div><div class="kpi-val p">${fmtFull(remGrand)}</div><div class="kpi-unit">$</div></div>`;
+  document.getElementById('stabs-rem').innerHTML=REM_MAQUINAS.map((m,i)=>`<button class="stab ${i===remActive?'active':''}" onclick="setRemTab(${i})">${m}</button>`).join('');
+  renderRemSection();
+}
+function setRemTab(i){remActive=i;document.querySelectorAll('#stabs-rem .stab').forEach((t,j)=>t.classList.toggle('active',j===i));renderRemSection();}
+function renderRemSection(){
+  const maq=REM_MAQUINAS[remActive];
+  document.getElementById('remChartTitle').textContent=`Remuneración diaria — ${maq}`;
+  document.getElementById('remTblTitle').textContent=`Tabla detalle — ${maq}`;
+  maq==='TOTAL'?renderRemTotal():renderRemMachine(maq);
+}
+function renderRemMachine(m){
+  const daily=calcRemDaily(m);
+  mkChart('cRemLine',{type:'line',data:{labels:daily.map(x=>fmtDate(x.fecha)),datasets:[
+    {label:`REM ${m} ($/MWh)`,data:daily.map(x=>x.remAvg),borderColor:'#a78bfa',backgroundColor:'#a78bfa22',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
+    {label:`CVP ${m} ($/MWh)`,data:daily.map(x=>x.cvpAvg),borderColor:'#f87171',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+  document.getElementById('tbl-rem').innerHTML=`<thead><tr><th>Fecha</th><th class="num">E (MWh)</th><th class="num">CVP_Comb</th><th class="num">CVP_Transp</th><th class="num">CVP_OyM</th><th class="num">CVP_Total</th><th class="num">REM avg</th><th class="num">REM total $</th></tr></thead><tbody>${
+    daily.map(x=>`<tr><td class="lbl">${fmtDate(x.fecha)}</td><td class="num">${fmtN(x.E,1)}</td><td class="num">${fmtK(x.combAvg)}</td><td class="num">${fmtK(x.transpAvg)}</td><td class="num">${fmtK(x.oymAvg)}</td><td class="num">${fmtK(x.cvpAvg)}</td><td class="num" style="color:var(--purple)">${fmtK(x.remAvg)}</td><td class="num" style="color:var(--purple)">${fmtFull(x.remTotal||x.remAvg*x.E)}</td></tr>`).join('')}</tbody>`;
+  buildRemDbgTable(m);
+}
+function renderRemTotal(){
+  const dateSet=new Set();MKEYS.forEach(m=>calcRemDaily(m).forEach(x=>dateSet.add(x.fecha)));
+  const dates=[...dateSet].sort();
+  const combined=dates.map(fecha=>{
+    let sumRemE=0,sumE=0,sumCvpE=0;
+    MKEYS.forEach(m=>{const d=calcRemDaily(m).find(x=>x.fecha===fecha);if(d){sumRemE+=d.remAvg*d.E;sumCvpE+=d.cvpAvg*d.E;sumE+=d.E;}});
+    return{fecha,E:sumE,remAvg:sumE?sumRemE/sumE:0,cvpAvg:sumE?sumCvpE/sumE:0,remTotal:sumRemE};
+  }).filter(x=>x.E>0);
+  mkChart('cRemLine',{type:'line',data:{labels:combined.map(x=>fmtDate(x.fecha)),datasets:[
+    {label:'REM prom. ponderado ($/MWh)',data:combined.map(x=>x.remAvg),borderColor:'#a78bfa',backgroundColor:'#a78bfa22',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
+    {label:'CVP prom. ponderado ($/MWh)',data:combined.map(x=>x.cvpAvg),borderColor:'#f87171',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+  document.getElementById('tbl-rem').innerHTML=`<thead><tr><th>Fecha</th><th class="num">E total (MWh)</th><th class="num">CVP prom.</th><th class="num">REM prom.</th><th class="num">REM total $</th></tr></thead><tbody>${
+    combined.map(x=>`<tr><td class="lbl">${fmtDate(x.fecha)}</td><td class="num">${fmtN(x.E,1)}</td><td class="num">${fmtK(x.cvpAvg)}</td><td class="num" style="color:var(--purple)">${fmtK(x.remAvg)}</td><td class="num" style="color:var(--purple)">${fmtFull(x.remTotal)}</td></tr>`).join('')}</tbody>`;
+  document.getElementById('tbl-rem-dbg').innerHTML='<tr><td class="rl" style="color:var(--muted)">Seleccioná una máquina individual para ver el detalle horario.</td></tr>';
+}
+function buildRemDbgTable(m){
+  const rows=getRows(EKEYS[m]).filter(r=>(r.avg||0)>0||(r.h&&r.h.some(v=>v>0)));
+  let html=`<thead><tr><th>Fecha</th>${Array.from({length:24},(_,i)=>`<th>${i+1}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r=>{
+    html+=`<tr><td class="rl">${fmtDate(r.fecha)}</td>`;
+    for(let h=0;h<24;h++){
+      const c=calcRemHour(m,r.fecha,h);
+      html+=c?`<td title="CVP:${fmtK(c.cvpTotal)} CMO×FP:${fmtK(c.cmoFP)}" style="background:rgba(167,139,250,0.18);color:#c4b5fd;font-size:9px">${fmtK(c.rem)}</td>`:`<td></td>`;
+    }
+    html+='</tr>';
+  });
+  document.getElementById('tbl-rem-dbg').innerHTML=html+'</tbody>';
+}
+
+// ── COSTOS ─────────────────────────────────────────────────────────────────
+function buildCostos(){
+  const cg=calcCostoGas();
+  document.getElementById('kpi-costos').innerHTML=
+    MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} — Costo Gas</div><div class="kpi-val d" style="color:${CL[i]}">${fmtFull(cg[m])}</div><div class="kpi-unit">$</div></div>`).join('')+
+    `<div class="kpi" style="border-color:rgba(248,113,113,.4)"><div class="kpi-lbl">TOTAL Costo Gas</div><div class="kpi-val d">${fmtFull(cg.TOTAL)}</div><div class="kpi-unit">$</div></div>`;
+
+  // Table: per-machine detail
+  const dates=allDates(Object.values(EKEYS));
+  const rows=MKEYS.map(m=>{
+    let total=0;
+    const eRows=getRows(EKEYS[m]);
+    const cRows=getRows(COMBKEYS[m]);
+    const tKey=TRANSPKEYS[m]; const tRows=tKey?getRows(tKey):[];
+    eRows.forEach(er=>{
+      const cr=cRows.find(x=>x.fecha===er.fecha);
+      const tr=tRows.find?.(x=>x.fecha===er.fecha);
+      const eh=er.h||Array(24).fill(er.avg||0);
+      const ch=cr?.h||Array(24).fill(cr?.avg||0);
+      const th=tr?.h||Array(24).fill(tr?.avg||0);
+      for(let i=0;i<24;i++) total+=((ch[i]||0)+(th[i]||0))*(eh[i]||0);
+    });
+    return{m,total};
+  });
+  document.getElementById('tbl-costos').innerHTML=`<thead><tr><th>Máquina</th><th class="num">CVP Comb. + Transp. × Energía</th><th>Unidad</th></tr></thead><tbody>${
+    rows.map(r=>`<tr><td class="lbl">${r.m}</td><td class="num">${fmtFull(r.total)}</td><td class="lbl" style="color:var(--muted)">$</td></tr>`).join('')
+  }<tr class="hi"><td class="lbl bold">TOTAL</td><td class="num bold" style="color:var(--danger)">${fmtFull(cg.TOTAL)}</td><td class="lbl" style="color:var(--muted)">$</td></tr></tbody>`;
+
+  // Daily chart
+  const daily=calcCostoGasDaily();
+  mkChart('cCostosLine',{type:'line',data:{labels:daily.map(x=>fmtDate(x.fecha)),datasets:[
+    {label:'Costo Gas diario ($)',data:daily.map(x=>x.val),borderColor:'#f87171',backgroundColor:'#f8717122',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+}
+
+// ── HEATMAP ────────────────────────────────────────────────────────────────
+const HMAP_OPTS=[
+  {l:'CMO $/MWh',k:'PRECIOS-CMO'},{l:'PPAD USD/MW',k:'PRECIOS-PPAD'},{l:'RPF Precio',k:'RPF-PRECIO_RPF'},
+  {l:'TG23 Energía',k:'AVALTG23-ENERGIA'},{l:'TG22 Energía',k:'AVALTG22-ENERGIA'},{l:'TV11 Energía',k:'AVALTV11-ENERGIA'},
+  {l:'TG23 Comb.Rem',k:'AVALTG23-CVPCOMBREM-GX'},{l:'TG22 Comb.Rem',k:'AVALTG22-CVPCOMBREM-GX'},
+  {l:'TG22 Transp.',k:'AVALTG22-CVPTRANSPREMPROV-GX'},{l:'TG23 Transp.',k:'AVALTG23-CVPTRANSPREMPROV-GX'},
+  {l:'TG22 O&M',k:'AVALTG22-CVPOYMREM-GX'},{l:'TG23 O&M',k:'AVALTG23-CVPOYMREM-GX'},
+  {l:'TG23 FP',k:'AVALTG23-FACTOR_PERDIDAS'},{l:'TG22 FP',k:'AVALTG22-FACTOR_PERDIDAS'},
+  {l:'TG23 Pot.Disp',k:'AVALTG23-POT_DISP'},{l:'TG22 Pot.Disp',k:'AVALTG22-POT_DISP'},
+  {l:'TV11 Pot.Disp',k:'AVALTV11-POT_DISP'},{l:'TV12 Pot.Disp',k:'AVALTV12-POT_DISP'},
+  {l:'TG23 PORC_RPF',k:'AVALTG23-RPF_GEN-PORC_RPF'},{l:'TG22 PORC_RPF',k:'AVALTG22-RPF_GEN-PORC_RPF'},
+  {l:'TV11 PORC_RPF',k:'AVALTV11-RPF_GEN-PORC_RPF'},{l:'TV12 PORC_RPF',k:'AVALTV12-RPF_GEN-PORC_RPF'},
+];
+let hmapActive=0;
+function buildHeatmap(){
+  document.getElementById('tabs-heatmap').innerHTML=HMAP_OPTS.map((o,i)=>`<button class="tab ${i===hmapActive?'active':''}" onclick="setHmapTab(${i})">${o.l}</button>`).join('');
+  renderHeatmap();
+}
+function setHmapTab(i){hmapActive=i;document.querySelectorAll('#tabs-heatmap .tab').forEach((t,j)=>t.classList.toggle('active',j===i));renderHeatmap();}
+function renderHeatmap(){
+  const opt=HMAP_OPTS[hmapActive];
+  document.getElementById('hmapTitle').textContent=`Perfil horario — ${opt.l}`;
+  const rows=getRows(opt.k).filter(r=>r.h&&r.h.some(v=>v!=null&&v>0));
+  if(!rows.length){document.getElementById('tbl-hmap').innerHTML='<tr><td style="color:var(--muted);padding:20px">Sin datos horarios.</td></tr>';return;}
+  const allV=rows.flatMap(r=>r.h.filter(v=>v!=null&&v>0));
+  const mn=Math.min(...allV),mx=Math.max(...allV);
+  let html='<thead><tr><th>Fecha</th>'+Array.from({length:24},(_,i)=>`<th>${i+1}</th>`).join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{
+    html+=`<tr><td class="rl">${fmtDate(r.fecha)}</td>`;
+    r.h.forEach(v=>{html+=v&&v>0?`<td title="${fmtN(v,0)}" style="background:${lerpColor(v,mn,mx)}"></td>`:`<td style="background:rgba(255,255,255,.03)"></td>`;});
+    html+='</tr>';
+  });
+  document.getElementById('tbl-hmap').innerHTML=html+'</tbody>';
+  document.getElementById('hmap-leg-bar').style.background='linear-gradient(to right,rgba(45,212,191,0.5),rgba(251,191,36,0.8),rgba(248,113,113,0.95))';
+}
+
+// ── CONFIG ─────────────────────────────────────────────────────────────────
+function buildConfig(){
+  document.getElementById('cfgFRA').value=CFG.FRA;
+  document.getElementById('cfgRMIN_LO').value=CFG.RMIN_LO;
+  document.getElementById('cfgRMIN_HI').value=CFG.RMIN_HI;
+  document.getElementById('cfgRMIN_THR').value=CFG.RMIN_THR;
+  document.getElementById('cfgCONF').value=CFG.CONF;
+  document.getElementById('cfgCANON').value=CFG.CANON_AGUA;
+  document.getElementById('cfgTRANSPORTE').value=CFG.TRANSPORTE;
+  document.getElementById('cfgENRE').value=CFG.ENRE;
+  // Build per-month TC/KP cards
+  const grid=document.getElementById('cfg-per-month-grid');
+  if(grid){
+    grid.innerHTML=Object.keys(MONTH_CFG).map(mk=>`
+      <div class="cfg-card">
+        <div class="cfg-title">${MONTH_META[mk].label}</div>
+        <div class="cfg-row"><label>Tipo de cambio ARS/USD</label><input class="cfg-inp" type="number" id="cfgTC_${mk}" value="${MONTH_CFG[mk].TC}" step="0.0001"></div>
+        <div class="cfg-row"><label>Kp — factor de potencia</label><input class="cfg-inp" type="number" id="cfgKP_${mk}" value="${MONTH_CFG[mk].KP}" step="0.01" min="0" max="1"></div>
+      </div>`).join('');
+  }
+  updateFormulaPreview();
+}
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+// initDashboard is called after data loads
+function initDashboard(loadedData) {
+  // Populate global data
+  Object.assign(ALL_DATA, loadedData.ALL_DATA);
+  Object.assign(MONTH_META, loadedData.MONTH_META_DYN);
+  Object.assign(MONTH_CFG, loadedData.MONTH_CFG_DYN);
+
+  // Populate month selector
+  const sel = document.getElementById('monthSel');
+  const keys = Object.keys(MONTH_META).sort(); // chronological if named MMMYYYY
+  sel.innerHTML = '';
+  keys.forEach((k, i) => {
+    const opt = document.createElement('option');
+    opt.value = k;
+    opt.textContent = MONTH_META[k].label;
+    if (i === keys.length - 1) opt.selected = true; // most recent
+    sel.appendChild(opt);
+  });
+
+  // Set current month to most recent
+  MONTH = keys[keys.length - 1];
+
+  // Hide loader, show dashboard
+  document.getElementById('load-screen').style.display = 'none';
+  document.getElementById('period-badge').textContent = MONTH_META[MONTH]?.badge || MONTH;
+  document.getElementById('sidebar-sub').textContent = MONTH_META[MONTH]?.label || MONTH;
+  const fraEl = document.getElementById('fml-fra');
+  if (fraEl) fraEl.textContent = CFG.FRA;
+  buildSection('resumen');
+}
+
+window.showSec=showSec;window.setETab=setETab;window.setRemTab=setRemTab;window.setHmapTab=setHmapTab;window.switchMonth=switchMonth;window.saveConfig=saveConfig;window.setPotDbgTab=setPotDbgTab;window.mkResumenTable=mkResumenTable;
+
+// Bootstrap: run loader then init
+(async () => {
+  try {
+    const loaded = await loadAllData();
+    if (loaded) initDashboard(loaded);
+  } catch(e) {
+    document.getElementById('load-status').textContent = '❌ Error: ' + e.message;
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
