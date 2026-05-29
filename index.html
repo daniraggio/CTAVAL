@@ -1534,33 +1534,6 @@ function buildCtrlRem(){
     const rows=[];
     let totalCombPlan=0,totalOymPlan=0,totalCombDecl=0,totalOymDecl=0;
 
-    // Ciclo combinado: compute effective combDecl per machine hour by hour
-    // If E_TV11_h > 0 => CVP_Comb_TG23_h declared = 0 (cycle closed, only TV paid)
-    // If E_TV12_h > 0 => CVP_Comb_TG22_h declared = 0
-    function combDeclEffective(m,desde,hasta,declPricePerMWh){
-      // For TG23: zero out hours where TV11 > 0
-      // For TG22: zero out hours where TV12 > 0
-      const pairTV = m==='TG23'?'TV11': m==='TG22'?'TV12':null;
-      if(!pairTV) return declPricePerMWh * energyRange(EKEYS[m],desde,hasta);
-      let total=0;
-      const eRows=getRows(EKEYS[m]);
-      const tvRows=getRows(EKEYS[pairTV]);
-      eRows.forEach(er=>{
-        if(er.fecha<desde||er.fecha>hasta)return;
-        const tvRow=tvRows.find(x=>x.fecha===er.fecha);
-        const eh=er.h||Array(24).fill(er.avg||0);
-        const tvh=tvRow?.h||Array(24).fill(tvRow?.avg||0);
-        for(let i=0;i<24;i++){
-          const e=eh[i]||0;
-          const tvE=tvh[i]||0;
-          // If TV is generating this hour, TG declared comb = 0
-          const price=tvE>0?0:declPricePerMWh;
-          total+=e*price;
-        }
-      });
-      return total;
-    }
-
     MKEYS.forEach(m=>{
       const combPlan=cvpAccumRange(COMBKEYS[m],EKEYS[m],desde,hasta);
       const TV=m.startsWith('TV');
@@ -1568,72 +1541,67 @@ function buildCtrlRem(){
       const eMWh=energyRange(EKEYS[m],desde,hasta);
       const combDpMWh=combDecl[m]||0;
       const oymDpMWh=TV?0:(oymDecl[m]||0);
-      // Ciclo combinado: effective declared comb (hora a hora)
-      const combD=combDeclEffective(m,desde,hasta,combDpMWh);
+      // Simple: declared = price x total energy (no ciclo combinado adjustment)
+      const combD=combDpMWh*eMWh;
       const oymD=TV?0:oymDpMWh*eMWh;
       const desvComb=combD-combPlan;
       const desvOym=TV?null:(oymD-oymPlan);
       totalCombPlan+=combPlan;
       totalCombDecl+=combD;
       if(!TV){ totalOymPlan+=oymPlan; totalOymDecl+=oymD; }
-      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym,combDpMWh,oymDpMWh,eMWh,TV});
+      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym,eMWh,TV});
     });
     const totDesvComb=totalCombDecl-totalCombPlan;
     const totDesvOym=totalOymDecl-totalOymPlan;
-    const fmt=v=>v==null||isNaN(v)?'—':fmtFull(v);
-    // positive desvio = declared > planilla = bad (we get less) = red
-    // negative desvio = declared < planilla = good (we get more) = green
-    const clr=v=>v===0?'var(--muted)':v>0?'var(--danger)':'var(--success)';
-    const arrow=v=>v===0?'':v>0?'▲':'▼';
+    // no decimals anywhere
+    const fmt=v=>(v==null||isNaN(v))?'—':Math.round(v).toLocaleString('es-AR');
+    // red = declared > planilla (we get less than declared = bad)
+    // green = declared < planilla (we get more = good)
+    const clr=v=>Math.abs(v)<1?'var(--muted)':v>0?'var(--danger)':'var(--success)';
+    const arrow=v=>Math.abs(v)<1?'':v>0?'▲':'▼';
     return `
     <div style="margin-bottom:28px">
       <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">${qNum==='M'?'Mes calendario':qNum+'° Quincena'} &nbsp;<span style="font-size:11px;color:var(--muted);font-weight:400">${desde} → ${hasta}</span></div>
       <div style="overflow-x:auto">
-        <table class="tbl" style="min-width:820px">
+        <table class="tbl" style="min-width:600px">
           <thead><tr>
             <th>Máquina</th>
             <th class="num">Energía (MWh)</th>
             <th class="num">Comb Planilla ($)</th>
-            <th class="num">Comb Decl. ($/MWh)</th>
             <th class="num">Comb Decl. ($)</th>
             <th class="num">Desvío Comb ($)</th>
             <th class="num">O&M Planilla ($)</th>
-            <th class="num">O&M Decl. ($/MWh)</th>
             <th class="num">O&M Decl. ($)</th>
             <th class="num">Desvío O&M ($)</th>
           </tr></thead>
           <tbody>
             ${rows.map(r=>`<tr>
               <td class="lbl bold">${r.m}</td>
-              <td class="num" style="color:var(--muted)">${fmt(r.eMWh)}</td>
+              <td class="num">${fmt(r.eMWh)}</td>
               <td class="num">${fmt(r.combPlan)}</td>
-              <td class="num">${r.combDpMWh?fmtN(r.combDpMWh,2):'—'}</td>
               <td class="num">${fmt(r.combD)}</td>
               <td class="num" style="color:${clr(r.desvComb)};font-weight:600">${arrow(r.desvComb)} ${fmt(Math.abs(r.desvComb))}</td>
               ${r.TV?
-                '<td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td>':
+                '<td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td>':
                 `<td class="num">${fmt(r.oymPlan)}</td>
-              <td class="num">${r.oymDpMWh?fmtN(r.oymDpMWh,2):'—'}</td>
               <td class="num">${fmt(r.oymD)}</td>
               <td class="num" style="color:${clr(r.desvOym)};font-weight:600">${arrow(r.desvOym)} ${fmt(Math.abs(r.desvOym))}</td>`}
             </tr>`).join('')}
             <tr class="hi" style="font-weight:700">
               <td class="lbl bold">TOTAL</td>
-              <td class="num" style="color:var(--muted)">—</td>
+              <td class="num">—</td>
               <td class="num">${fmt(totalCombPlan)}</td>
-              <td class="num">—</td>
-              <td class="num" style="color:var(--teal)">${fmt(totalCombDecl)}</td>
-              <td class="num" style="color:${clr(totDesvComb)}">${arrow(totDesvComb)} ${fmt(Math.abs(totDesvComb))}</td>
+              <td class="num">${fmt(totalCombDecl)}</td>
+              <td class="num" style="color:${clr(totDesvComb)};font-weight:700">${arrow(totDesvComb)} ${fmt(Math.abs(totDesvComb))}</td>
               <td class="num">${fmt(totalOymPlan)}</td>
-              <td class="num">—</td>
-              <td class="num" style="color:var(--teal)">${fmt(totalOymDecl)}</td>
-              <td class="num" style="color:${clr(totDesvOym)}">${arrow(totDesvOym)} ${fmt(Math.abs(totDesvOym))}</td>
+              <td class="num">${fmt(totalOymDecl)}</td>
+              <td class="num" style="color:${clr(totDesvOym)};font-weight:700">${arrow(totDesvOym)} ${fmt(Math.abs(totDesvOym))}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <div style="margin-top:8px;font-size:11px;color:var(--muted)">
-        ▲ verde = declarado mayor a planilla (nos pagan más) &nbsp;|&nbsp; ▼ rojo = declarado menor a planilla (nos pagan menos)
+        ▲ rojo = declarado > planilla &nbsp;|&nbsp; ▼ verde = declarado < planilla
       </div>
     </div>`;
   }
