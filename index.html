@@ -1458,14 +1458,14 @@ function buildConfig(){
         <div class="cfg-row"><label>Desde</label><input class="cfg-inp" type="date" id="cfgQ1d_${mk}" value="${MONTH_CFG[mk].Q1d||''}" style="width:140px"></div>
         <div class="cfg-row"><label>Hasta</label><input class="cfg-inp" type="date" id="cfgQ1h_${mk}" value="${MONTH_CFG[mk].Q1h||''}" style="width:140px"></div>
         ${['TG23','TG22','TV11','TV12'].map(m=>`
-        <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($)</label><input class="cfg-inp" type="number" id="cfgQ1Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q1Comb||{})[m]||''}" step="1" style="width:130px"></div>
-        <div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($)</label><input class="cfg-inp" type="number" id="cfgQ1Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q1Oym||{})[m]||''}" step="1" style="width:130px"></div>`).join('')}
+        <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ1Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q1Comb||{})[m]||''}" step="0.01" style="width:130px"></div>
+        ${m.startsWith('TV')?'':(`<div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ1Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q1Oym||{})[m]||''}" step="0.01" style="width:130px"></div>`)}`).join('')}
         <div style="margin:14px 0 6px;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">2° Quincena</div>
         <div class="cfg-row"><label>Desde</label><input class="cfg-inp" type="date" id="cfgQ2d_${mk}" value="${MONTH_CFG[mk].Q2d||''}" style="width:140px"></div>
         <div class="cfg-row"><label>Hasta</label><input class="cfg-inp" type="date" id="cfgQ2h_${mk}" value="${MONTH_CFG[mk].Q2h||''}" style="width:140px"></div>
         ${['TG23','TG22','TV11','TV12'].map(m=>`
-        <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($)</label><input class="cfg-inp" type="number" id="cfgQ2Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q2Comb||{})[m]||''}" step="1" style="width:130px"></div>
-        <div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($)</label><input class="cfg-inp" type="number" id="cfgQ2Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q2Oym||{})[m]||''}" step="1" style="width:130px"></div>`).join('')}
+        <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ2Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q2Comb||{})[m]||''}" step="0.01" style="width:130px"></div>
+        ${m.startsWith('TV')?'':(`<div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ2Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q2Oym||{})[m]||''}" step="0.01" style="width:130px"></div>`)}`).join('')}
       </div>`).join('');
   }
   updateFormulaPreview();
@@ -1551,7 +1551,9 @@ function buildCtrlRem(){
     const totDesvComb=totalCombDecl-totalCombPlan;
     const totDesvOym=totalOymDecl-totalOymPlan;
     const fmt=v=>v==null||isNaN(v)?'—':fmtFull(v);
-    const clr=v=>v===0?'var(--muted)':v>0?'var(--success)':'var(--danger)';
+    // positive desvio = declared > planilla = bad (we get less) = red
+    // negative desvio = declared < planilla = good (we get more) = green
+    const clr=v=>v===0?'var(--muted)':v>0?'var(--danger)':'var(--success)';
     const arrow=v=>v===0?'':v>0?'▲':'▼';
     return `
     <div style="margin-bottom:28px">
@@ -1578,10 +1580,12 @@ function buildCtrlRem(){
               <td class="num" style="color:var(--teal)">${r.combDpMWh?fmtN(r.combDpMWh,2):'—'}</td>
               <td class="num" style="color:var(--teal)">${r.combD?fmt(r.combD):'—'}</td>
               <td class="num" style="color:${clr(r.desvComb)}">${r.combD?arrow(r.desvComb)+' '+fmt(Math.abs(r.desvComb)):'—'}</td>
-              <td class="num">${r.oymPlan?fmt(r.oymPlan):'—'}</td>
+              ${r.m.startsWith('TV')?
+                '<td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td>':
+                `<td class="num">${r.oymPlan?fmt(r.oymPlan):'—'}</td>
               <td class="num" style="color:var(--teal)">${r.oymDpMWh?fmtN(r.oymDpMWh,2):'—'}</td>
               <td class="num" style="color:var(--teal)">${r.oymD?fmt(r.oymD):'—'}</td>
-              <td class="num" style="color:${clr(r.desvOym)}">${r.oymD?arrow(r.desvOym)+' '+fmt(Math.abs(r.desvOym)):'—'}</td>
+              <td class="num" style="color:${clr(r.desvOym)}">${r.oymD?arrow(r.desvOym)+' '+fmt(Math.abs(r.desvOym)):'—'}</td>`}
             </tr>`).join('')}
             <tr class="hi" style="font-weight:700">
               <td class="lbl bold">TOTAL</td>
@@ -1604,41 +1608,67 @@ function buildCtrlRem(){
     </div>`;
   }
 
-  // Show all configured quincenas across all months, sorted by date
+  // Show quincenas for selected month only
   const allQuincenas=[];
-  Object.keys(MONTH_CFG).sort().forEach(mk=>{
-    const m=MONTH_CFG[mk];
-    const label=MONTH_META[mk]?.label||mk;
-    if(m.Q1d&&m.Q1h) allQuincenas.push({mk,label,qNum:1,desde:m.Q1d,hasta:m.Q1h,combDecl:m.Q1Comb||{},oymDecl:m.Q1Oym||{}});
-    if(m.Q2d&&m.Q2h) allQuincenas.push({mk,label,qNum:2,desde:m.Q2d,hasta:m.Q2h,combDecl:m.Q2Comb||{},oymDecl:m.Q2Oym||{}});
-  });
-  // Sort by desde date
-  allQuincenas.sort((a,b)=>a.desde.localeCompare(b.desde));
+  const m=MONTH_CFG[MONTH];
+  if(m){
+    if(m.Q1d&&m.Q1h) allQuincenas.push({qNum:1,desde:m.Q1d,hasta:m.Q1h,combDecl:m.Q1Comb||{},oymDecl:m.Q1Oym||{}});
+    if(m.Q2d&&m.Q2h) allQuincenas.push({qNum:2,desde:m.Q2d,hasta:m.Q2h,combDecl:m.Q2Comb||{},oymDecl:m.Q2Oym||{}});
+  }
 
   let out='';
-  // Group by month for headers
-  let lastMk='';
   allQuincenas.forEach(q=>{
-    if(q.mk!==lastMk){
-      out+=`<div style="font-size:16px;font-weight:700;color:var(--accent);margin:24px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px">${q.label}</div>`;
-      lastMk=q.mk;
-    }
     out+=renderQuincena(q.qNum,q.desde,q.hasta,q.combDecl,q.oymDecl);
   });
 
   if(!out) out='<div style="color:var(--muted)">Completá los valores declarados en Configuración.</div>';
 
-  // Add full month section for currently selected month
-  const mkCur=MONTH;
-  const metaCur=MONTH_META[mkCur];
-  if(metaCur){
-    // Derive first and last day of the month from the data
+  // Add full month section using declared values from configured quincenas
+  const metaCur=MONTH_META[MONTH];
+  const mcCur=MONTH_CFG[MONTH];
+  if(metaCur&&mcCur){
     const allDts=allDates(Object.values(EKEYS));
     if(allDts.length){
-      const desde=allDts[0];
-      const hasta=allDts[allDts.length-1];
+      const mesDesde=allDts[0];
+      const mesHasta=allDts[allDts.length-1];
+
+      // Build per-machine declared $/MWh for each day using quincenas
+      // For month total: compute energy-weighted avg $/MWh from quincenas
+      // Then use that as declared for month calc
+      // Also detect days not covered by any quincena
+      const q1d=mcCur.Q1d||''; const q1h=mcCur.Q1h||'';
+      const q2d=mcCur.Q2d||''; const q2h=mcCur.Q2h||'';
+
+      // Find uncovered days in month
+      const uncovered=allDts.filter(d=>{
+        const inQ1=q1d&&q1h&&d>=q1d&&d<=q1h;
+        const inQ2=q2d&&q2h&&d>=q2d&&d<=q2h;
+        return !inQ1&&!inQ2;
+      });
+
+      // For month total: merge declared values weighted by energy
+      // combDecl[m] = weighted avg $/MWh across quincenas for that machine
+      const combDeclMes={};const oymDeclMes={};
+      MKEYS.forEach(m=>{
+        const TV=m.startsWith('TV');
+        let totalE=0,totalCombW=0,totalOymW=0;
+        [[q1d,q1h,mcCur.Q1Comb||{},mcCur.Q1Oym||{}],
+         [q2d,q2h,mcCur.Q2Comb||{},mcCur.Q2Oym||{}]].forEach(([qd,qh,qc,qo])=>{
+          if(!qd||!qh)return;
+          const e=energyRange(EKEYS[m],qd,qh);
+          totalE+=e;
+          totalCombW+=(qc[m]||0)*e;
+          totalOymW+=TV?0:(qo[m]||0)*e;
+        });
+        combDeclMes[m]=totalE>0?totalCombW/totalE:0;
+        oymDeclMes[m]=TV?0:(totalE>0?totalOymW/totalE:0);
+      });
+
       out+=`<div style="font-size:16px;font-weight:700;color:var(--warn);margin:24px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px">${metaCur.label} — Mes completo</div>`;
-      out+=renderQuincena('M',desde,hasta,{},{});
+      if(uncovered.length){
+        out+=`<div style="margin-bottom:12px;padding:8px 14px;background:rgba(251,191,36,.08);border-left:2px solid var(--warn);border-radius:4px;font-size:12px;color:var(--warn)">⚠ ${uncovered.length} día(s) sin quincena configurada: ${uncovered.map(d=>d.slice(8)+'/'+d.slice(5,7)).join(', ')}</div>`;
+      }
+      out+=renderQuincena('M',mesDesde,mesHasta,combDeclMes,oymDeclMes);
     }
   }
 
