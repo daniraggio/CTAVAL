@@ -2,7 +2,7 @@ name: Actualizar Planillas AVAL
 
 on:
   schedule:
-    - cron: '0 11 * * *'
+    - cron: '0 11 * * *'   # 8 AM Argentina (UTC-3)
   workflow_dispatch:
 
 jobs:
@@ -21,20 +21,10 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar dependencias
-        run: |
-          pip install playwright requests pandas xlrd openpyxl
-          playwright install chromium
+        run: pip install requests
 
       - name: Ejecutar script de descarga
         run: python scripts/descargar_aval.py
-
-      - name: Subir capturas de debug
-        if: always()   # <- sube aunque el paso anterior falle
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-screenshots
-          path: debug/
-          if-no-files-found: ignore
 
       - name: Commit y push si hay cambios
         run: |
