@@ -6,11 +6,11 @@ Ruta en el repo: scripts/descargar_aval.py
 import shutil
 from datetime import datetime
 from pathlib import Path
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import sync_playwright
 
 BASE_URL   = "http://orazul.cilary.com/"
 BUSQUEDA   = "aval"
-MAQUINA    = "AVAL - CTALVALG - c.termica alto valle"
+MAQUINA    = "c.termica alto valle"
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data"
 DEBUG_DIR  = Path(__file__).resolve().parent.parent / "debug"
 
@@ -20,35 +20,28 @@ MESES_ES = {
     9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"
 }
 
-
 def nombre_archivo():
     now = datetime.now()
     return f"AVAL_{now.year}_{now.month:02d}.xls"
-
 
 def guardar_debug(page, nombre):
     DEBUG_DIR.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(DEBUG_DIR / f"{nombre}.png"), full_page=True)
     print(f"  📸 {nombre}.png")
 
-
 def selectpicker_elegir(page, select_id, valor):
     page.evaluate(f"""
         var sel = document.getElementById('{select_id}');
         sel.value = '{valor}';
         sel.dispatchEvent(new Event('change', {{ bubbles: true }}));
-        if (window.$ && $(sel).selectpicker) {{
-            $(sel).selectpicker('refresh');
-        }}
+        if (window.$ && $(sel).selectpicker) $(sel).selectpicker('refresh');
     """)
     page.wait_for_timeout(1_000)
-
 
 def descargar_planilla():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     destino = OUTPUT_DIR / nombre_archivo()
     now     = datetime.now()
-
     print(f"[{now:%H:%M:%S}] Iniciando → {destino.name}")
 
     with sync_playwright() as p:
@@ -69,11 +62,9 @@ def descargar_planilla():
         print(f"  → Año {now.year} / Mes {MESES_ES[now.month]}...")
         selectpicker_elegir(page, "anio", str(now.year))
         selectpicker_elegir(page, "mes", str(now.month))
-        guardar_debug(page, "01_dropdowns")
 
-        # 3. Escribir "aval" en el input visible
-        print(f"  → Escribiendo '{BUSQUEDA}' en buscador...")
-        # El input de búsqueda es el único visible en ese momento
+        # 3. Escribir en buscador
+        print(f"  → Buscando '{BUSQUEDA}'...")
         page.evaluate(f"""
             () => {{
                 let inputs = Array.from(document.querySelectorAll('input[type=text]'));
@@ -87,33 +78,65 @@ def descargar_planilla():
             }}
         """)
         page.wait_for_timeout(1_500)
-        guardar_debug(page, "02_busqueda")
 
-        # 4. Seleccionar la máquina — click directo sobre el elemento de la lista
+        # 4. Seleccionar máquina
         print("  → Seleccionando máquina...")
-        # Buscar el primer elemento de la lista que contenga el texto
-        maquina_loc = page.locator("li, a, span, div").filter(has_text="c.termica alto valle").first
-        maquina_loc.click()
+        page.locator("li, a, span, div").filter(has_text=MAQUINA).first.click()
         page.wait_for_timeout(1_000)
-        guardar_debug(page, "03_maquina_seleccionada")
+        guardar_debug(page, "01_maquina")
 
-        # 5. Click en Generar y esperar el link dinámicamente
-        print("  → Generando archivo (esperando link)...")
+        # 5. Click Generar y esperar el link — solo links de orazul.cilary.com
+        print("  → Generando archivo...")
         page.get_by_role("button", name="Generar").click()
 
-        # Esperar hasta 30s a que aparezca el link .xls
-        link_xls = page.locator("a[href*='.xls']")
-        link_xls.wait_for(timeout=30_000)
-        guardar_debug(page, "04_link_generado")
+        # Esperar link que apunte al servidor orazul (no a github)
+        link_xls = page.locator("a[href*='orazul'][href*='.xls'], a[href*='cilary'][href*='.xls']")
+        
+        # Si no tiene dominio completo, buscar por href relativo
+        if link_xls.count() == 0:
+            link_xls = page.locator("a[href$='.xls']:not([href*='github'])")
 
-        # 6. Descargar
-        print("  → Descargando...")
+        link_xls.wait_for(timeout=30_000)
+        
+        # Loguear el href real antes de descargar
+        href = link_xls.first.get_attribute("href")
+        print(f"  → Link encontrado: {href}")
+        guardar_debug(page, "02_link_listo")
+
+        # 6. Descargar interceptando la respuesta de red
         with page.expect_download(timeout=30_000) as dl_info:
             link_xls.first.click()
 
         download = dl_info.value
-        shutil.copy(download.path(), destino)
-        print(f"  ✅ Guardado: {destino}")
+        
+        # Verificar que lo descargado es realmente un XLS (no HTML)
+        tmp = download.path()
+        with open(tmp, 'rb') as f:
+            header = f.read(8)
+        
+        # XLS real empieza con D0 CF 11 E0 (formato OLE2) o PK (xlsx)
+        if header[:4] in [b'\xd0\xcf\x11\xe0', b'PK\x03\x04']:
+            shutil.copy(tmp, destino)
+            print(f"  ✅ XLS válido guardado: {destino}")
+        else:
+            # Es HTML u otra cosa — intentar descarga directa via URL
+            print(f"  ⚠ Archivo descargado no es XLS válido (header: {header[:4].hex()})")
+            print(f"  → Intentando descarga directa desde: {href}")
+            
+            if href and not href.startswith('http'):
+                href = BASE_URL.rstrip('/') + '/' + href.lstrip('/')
+            
+            import urllib.request
+            urllib.request.urlretrieve(href, destino)
+            
+            with open(destino, 'rb') as f:
+                header2 = f.read(8)
+            print(f"  → Header descarga directa: {header2[:4].hex()}")
+            
+            if header2[:4] not in [b'\xd0\xcf\x11\xe0', b'PK\x03\x04']:
+                raise ValueError(f"El archivo descargado no es un XLS válido. Header: {header2[:4].hex()}")
+            
+            print(f"  ✅ XLS válido guardado via URL directa: {destino}")
 
         browser.close()
 
