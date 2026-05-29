@@ -1,75 +1,72 @@
 """
 descargar_aval.py
------------------
-Descarga la planilla XLS mensual de la Central Térmica Alto Valle
-llamando directamente a la API POST /get_report de orazul.cilary.com.
-No necesita navegador — usa solo requests.
-
 Ruta en el repo: scripts/descargar_aval.py
 """
 
 import requests
-import shutil
 from datetime import datetime
 from pathlib import Path
 
 BASE_URL   = "http://orazul.cilary.com"
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data"
 
-# Grupos de AVAL - CTALVALG - c.termica alto valle
 GRUPOS = ["AVALTV12", "AVALTV11", "AVALTG22", "AVALTG21",
           "AVALTG23", "AVALCC22", "AVALCC23"]
 
 
-def nombre_archivo():
-    now = datetime.now()
-    return f"AVAL_{now.year}_{now.month:02d}.xls"
-
-
 def descargar_planilla():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    destino = OUTPUT_DIR / nombre_archivo()
-    now     = datetime.now()
+    now = datetime.now()
+    nombre_local = f"AVAL_{now.year}_{now.month:02d}.xls"
+    destino = OUTPUT_DIR / nombre_local
 
-    print(f"[{now:%H:%M:%S}] Iniciando → {destino.name}")
+    print(f"[{now:%H:%M:%S}] Iniciando descarga {now.year}/{now.month}...")
 
     session = requests.Session()
-    session.headers.update({"Referer": BASE_URL + "/", "Origin": BASE_URL})
+    session.headers.update({
+        "Referer": BASE_URL + "/",
+        "Origin":  BASE_URL,
+        "X-Requested-With": "XMLHttpRequest",
+    })
 
-    # 1. POST a /get_report para generar el archivo
-    print(f"  → Solicitando reporte ({now.year}/{now.month})...")
-    resp = session.post(
-        f"{BASE_URL}/get_report",
-        data={
-            "grupos":   GRUPOS,
-            "contrato": "",
-            "anio":     str(now.year),
-            "mes":      str(now.month),
-        },
-        timeout=60,
-    )
-    resp.raise_for_status()
+    # jQuery $.ajax serializa arrays como "grupos[]=VAL1&grupos[]=VAL2"
+    # requests con lista en data lo manda igual cuando la key termina en []
+    # Probamos las dos formas y usamos la que devuelva un .xls válido
+    payload_opciones = [
+        # Opción A: key normal con lista (requests la repite automáticamente)
+        [("grupos", g) for g in GRUPOS] +
+        [("contrato", ""), ("anio", str(now.year)), ("mes", str(now.month))],
 
-    nombre_xls = resp.text.strip()
-    print(f"  → Servidor generó: {nombre_xls}")
+        # Opción B: key con corchetes (jQuery style)
+        [("grupos[]", g) for g in GRUPOS] +
+        [("contrato", ""), ("anio", str(now.year)), ("mes", str(now.month))],
+    ]
 
-    if not nombre_xls.endswith(".xls"):
-        raise ValueError(f"Respuesta inesperada del servidor: {nombre_xls!r}")
+    nombre_servidor = None
+    for i, payload in enumerate(payload_opciones):
+        print(f"  → Intentando payload opción {i+1}...")
+        resp = session.post(f"{BASE_URL}/get_report", data=payload, timeout=60)
+        resp.raise_for_status()
+        texto = resp.text.strip()
+        print(f"     Respuesta: {texto!r}")
+        if texto.endswith(".xls"):
+            nombre_servidor = texto
+            break
 
-    # 2. Descargar el archivo desde /static/reports/
-    url_xls = f"{BASE_URL}/static/reports/{nombre_xls}"
-    print(f"  → Descargando desde: {url_xls}")
+    if not nombre_servidor:
+        raise ValueError(f"Ningún payload generó un .xls válido")
+
+    url_xls = f"{BASE_URL}/static/reports/{nombre_servidor}"
+    print(f"  → Descargando: {url_xls}")
 
     dl = session.get(url_xls, timeout=60)
     dl.raise_for_status()
 
-    # Validar que es un XLS real (OLE2 header = D0 CF 11 E0)
     if dl.content[:4] != b'\xd0\xcf\x11\xe0':
-        raise ValueError(f"El archivo descargado no es un XLS válido. Header: {dl.content[:4].hex()}")
+        raise ValueError(f"Archivo no es XLS válido. Header: {dl.content[:4].hex()}\nContenido: {dl.content[:200]}")
 
     destino.write_bytes(dl.content)
-    print(f"  ✅ Guardado: {destino} ({len(dl.content):,} bytes)")
-
+    print(f"  ✅ Guardado: {nombre_local} ({len(dl.content):,} bytes)")
     return destino
 
 
