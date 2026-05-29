@@ -1533,20 +1533,50 @@ function buildCtrlRem(){
     if(!desde||!hasta)return'';
     const rows=[];
     let totalCombPlan=0,totalOymPlan=0,totalCombDecl=0,totalOymDecl=0;
+
+    // Ciclo combinado: compute effective combDecl per machine hour by hour
+    // If E_TV11_h > 0 => CVP_Comb_TG23_h declared = 0 (cycle closed, only TV paid)
+    // If E_TV12_h > 0 => CVP_Comb_TG22_h declared = 0
+    function combDeclEffective(m,desde,hasta,declPricePerMWh){
+      // For TG23: zero out hours where TV11 > 0
+      // For TG22: zero out hours where TV12 > 0
+      const pairTV = m==='TG23'?'TV11': m==='TG22'?'TV12':null;
+      if(!pairTV) return declPricePerMWh * energyRange(EKEYS[m],desde,hasta);
+      let total=0;
+      const eRows=getRows(EKEYS[m]);
+      const tvRows=getRows(EKEYS[pairTV]);
+      eRows.forEach(er=>{
+        if(er.fecha<desde||er.fecha>hasta)return;
+        const tvRow=tvRows.find(x=>x.fecha===er.fecha);
+        const eh=er.h||Array(24).fill(er.avg||0);
+        const tvh=tvRow?.h||Array(24).fill(tvRow?.avg||0);
+        for(let i=0;i<24;i++){
+          const e=eh[i]||0;
+          const tvE=tvh[i]||0;
+          // If TV is generating this hour, TG declared comb = 0
+          const price=tvE>0?0:declPricePerMWh;
+          total+=e*price;
+        }
+      });
+      return total;
+    }
+
     MKEYS.forEach(m=>{
       const combPlan=cvpAccumRange(COMBKEYS[m],EKEYS[m],desde,hasta);
-      const oymPlan=OYMKEYS[m]?cvpAccumRange(OYMKEYS[m],EKEYS[m],desde,hasta):0;
+      const TV=m.startsWith('TV');
+      const oymPlan=(!TV&&OYMKEYS[m])?cvpAccumRange(OYMKEYS[m],EKEYS[m],desde,hasta):0;
       const eMWh=energyRange(EKEYS[m],desde,hasta);
-      // declared is $/MWh → multiply by energy MWh of period
       const combDpMWh=combDecl[m]||0;
-      const oymDpMWh=oymDecl[m]||0;
-      const combD=combDpMWh*eMWh;
-      const oymD=oymDpMWh*eMWh;
+      const oymDpMWh=TV?0:(oymDecl[m]||0);
+      // Ciclo combinado: effective declared comb (hora a hora)
+      const combD=combDeclEffective(m,desde,hasta,combDpMWh);
+      const oymD=TV?0:oymDpMWh*eMWh;
       const desvComb=combD-combPlan;
-      const desvOym=oymD-oymPlan;
-      totalCombPlan+=combPlan; totalOymPlan+=oymPlan;
-      totalCombDecl+=combD;    totalOymDecl+=oymD;
-      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym,combDpMWh,oymDpMWh,eMWh});
+      const desvOym=TV?null:(oymD-oymPlan);
+      totalCombPlan+=combPlan;
+      totalCombDecl+=combD;
+      if(!TV){ totalOymPlan+=oymPlan; totalOymDecl+=oymD; }
+      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym,combDpMWh,oymDpMWh,eMWh,TV});
     });
     const totDesvComb=totalCombDecl-totalCombPlan;
     const totDesvOym=totalOymDecl-totalOymPlan;
@@ -1577,15 +1607,15 @@ function buildCtrlRem(){
               <td class="lbl bold">${r.m}</td>
               <td class="num" style="color:var(--muted)">${fmt(r.eMWh)}</td>
               <td class="num">${fmt(r.combPlan)}</td>
-              <td class="num" style="color:var(--teal)">${r.combDpMWh?fmtN(r.combDpMWh,2):'—'}</td>
-              <td class="num" style="color:var(--teal)">${r.combD?fmt(r.combD):'—'}</td>
-              <td class="num" style="color:${clr(r.desvComb)}">${r.combD?arrow(r.desvComb)+' '+fmt(Math.abs(r.desvComb)):'—'}</td>
-              ${r.m.startsWith('TV')?
+              <td class="num">${r.combDpMWh?fmtN(r.combDpMWh,2):'—'}</td>
+              <td class="num">${fmt(r.combD)}</td>
+              <td class="num" style="color:${clr(r.desvComb)};font-weight:600">${arrow(r.desvComb)} ${fmt(Math.abs(r.desvComb))}</td>
+              ${r.TV?
                 '<td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td><td class="num" style="color:var(--muted)">N/A</td>':
-                `<td class="num">${r.oymPlan?fmt(r.oymPlan):'—'}</td>
-              <td class="num" style="color:var(--teal)">${r.oymDpMWh?fmtN(r.oymDpMWh,2):'—'}</td>
-              <td class="num" style="color:var(--teal)">${r.oymD?fmt(r.oymD):'—'}</td>
-              <td class="num" style="color:${clr(r.desvOym)}">${r.oymD?arrow(r.desvOym)+' '+fmt(Math.abs(r.desvOym)):'—'}</td>`}
+                `<td class="num">${fmt(r.oymPlan)}</td>
+              <td class="num">${r.oymDpMWh?fmtN(r.oymDpMWh,2):'—'}</td>
+              <td class="num">${fmt(r.oymD)}</td>
+              <td class="num" style="color:${clr(r.desvOym)};font-weight:600">${arrow(r.desvOym)} ${fmt(Math.abs(r.desvOym))}</td>`}
             </tr>`).join('')}
             <tr class="hi" style="font-weight:700">
               <td class="lbl bold">TOTAL</td>
@@ -1603,7 +1633,7 @@ function buildCtrlRem(){
         </table>
       </div>
       <div style="margin-top:8px;font-size:11px;color:var(--muted)">
-        ▲ verde = declarado mayor a planilla &nbsp;|&nbsp; ▼ rojo = declarado menor a planilla
+        ▲ verde = declarado mayor a planilla (nos pagan más) &nbsp;|&nbsp; ▼ rojo = declarado menor a planilla (nos pagan menos)
       </div>
     </div>`;
   }
