@@ -2,9 +2,8 @@ name: Actualizar Planillas AVAL
 
 on:
   schedule:
-    # Corre todos los días a las 8:00 AM hora Argentina (UTC-3 = 11:00 UTC)
     - cron: '0 11 * * *'
-  workflow_dispatch: # También permite correrlo manualmente desde GitHub
+  workflow_dispatch:
 
 jobs:
   descargar-planillas:
@@ -16,18 +15,26 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Instalar Python y dependencias
+      - name: Instalar Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Instalar librerías
+      - name: Instalar dependencias
         run: |
           pip install playwright requests pandas xlrd openpyxl
           playwright install chromium
 
       - name: Ejecutar script de descarga
         run: python scripts/descargar_aval.py
+
+      - name: Subir capturas de debug
+        if: always()   # <- sube aunque el paso anterior falle
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: debug/
+          if-no-files-found: ignore
 
       - name: Commit y push si hay cambios
         run: |
