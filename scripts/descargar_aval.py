@@ -1,12 +1,12 @@
 """
-descargar_aval.py - con debug mode para inspeccionar el DOM
+descargar_aval.py
 Ruta en el repo: scripts/descargar_aval.py
 """
 
 import shutil
 from datetime import datetime
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 BASE_URL   = "http://orazul.cilary.com/"
 BUSQUEDA   = "aval"
@@ -27,11 +27,9 @@ def nombre_archivo():
 
 
 def guardar_debug(page, nombre):
-    """Guarda screenshot + HTML para inspección."""
     DEBUG_DIR.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(DEBUG_DIR / f"{nombre}.png"), full_page=True)
-    (DEBUG_DIR / f"{nombre}.html").write_text(page.content(), encoding="utf-8")
-    print(f"  📸 Debug guardado: debug/{nombre}.png + .html")
+    print(f"  📸 {nombre}.png")
 
 
 def selectpicker_elegir(page, select_id, valor):
@@ -58,91 +56,65 @@ def descargar_planilla():
         context = browser.new_context(accept_downloads=True)
         page    = context.new_page()
 
-        # 1. Abrir sitio
+        # 1. Abrir sitio y click en Posoperativo
         print("  → Abriendo sitio...")
         page.goto(BASE_URL, timeout=30_000)
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2_000)
-        guardar_debug(page, "01_inicio")
-
-        # 2. Click en tab "Posoperativo"
-        print("  → Navegando a Posoperativo...")
+        page.wait_for_timeout(1_500)
         page.get_by_text("Posoperativo", exact=True).click()
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2_000)
-        guardar_debug(page, "02_posoperativo")
+        page.wait_for_timeout(1_500)
 
-        # 3. Mostrar todos los inputs/selects visibles
-        elementos = page.evaluate("""
-            () => {
-                let info = [];
-                document.querySelectorAll('input, select, button').forEach(el => {
-                    info.push({
-                        tag: el.tagName,
-                        id: el.id,
-                        name: el.name,
-                        type: el.type,
-                        class: el.className,
-                        visible: el.offsetParent !== null,
-                        placeholder: el.placeholder || ''
-                    });
-                });
-                return info;
-            }
-        """)
-        print("\n  📋 Elementos encontrados en el DOM:")
-        for el in elementos:
-            print(f"     {el['tag']} id={el['id']} name={el['name']} type={el['type']} visible={el['visible']} class={el['class'][:50]}")
-
-        # 4. Año via JS
-        print(f"\n  → Seleccionando año {now.year}...")
+        # 2. Año y Mes via JS
+        print(f"  → Año {now.year} / Mes {MESES_ES[now.month]}...")
         selectpicker_elegir(page, "anio", str(now.year))
-        guardar_debug(page, "03_anio")
-
-        # 5. Mes via JS
-        print(f"  → Seleccionando mes {MESES_ES[now.month]}...")
         selectpicker_elegir(page, "mes", str(now.month))
-        guardar_debug(page, "04_mes")
+        guardar_debug(page, "01_dropdowns")
 
-        # 6. Buscar el input de búsqueda por id/name/placeholder en lugar de type
-        print(f"  → Buscando campo de texto para '{BUSQUEDA}'...")
-        # Intentar por JS directamente en el input de búsqueda
+        # 3. Escribir "aval" en el input visible
+        print(f"  → Escribiendo '{BUSQUEDA}' en buscador...")
+        # El input de búsqueda es el único visible en ese momento
         page.evaluate(f"""
             () => {{
-                let inputs = document.querySelectorAll('input');
-                for (let inp of inputs) {{
-                    if (inp.offsetParent !== null) {{  // solo visibles
-                        inp.value = '{BUSQUEDA}';
-                        inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        inp.dispatchEvent(new Event('keyup', {{ bubbles: true }}));
-                        break;
-                    }}
+                let inputs = Array.from(document.querySelectorAll('input[type=text]'));
+                let visible = inputs.find(i => i.offsetParent !== null);
+                if (visible) {{
+                    visible.focus();
+                    visible.value = '{BUSQUEDA}';
+                    visible.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    visible.dispatchEvent(new Event('keyup', {{ bubbles: true }}));
                 }}
             }}
         """)
         page.wait_for_timeout(1_500)
-        guardar_debug(page, "05_busqueda")
+        guardar_debug(page, "02_busqueda")
 
-        # 7. Seleccionar la máquina de la lista
-        print("  → Seleccionando AVAL - CTALVALG - c.termica alto valle...")
-        page.get_by_text(MAQUINA, exact=False).first.click()
-        page.wait_for_timeout(500)
-        guardar_debug(page, "06_maquina")
+        # 4. Seleccionar la máquina — click directo sobre el elemento de la lista
+        print("  → Seleccionando máquina...")
+        # Buscar el primer elemento de la lista que contenga el texto
+        maquina_loc = page.locator("li, a, span, div").filter(has_text="c.termica alto valle").first
+        maquina_loc.click()
+        page.wait_for_timeout(1_000)
+        guardar_debug(page, "03_maquina_seleccionada")
 
-        # 8. Click en "Generar"
-        print("  → Generando archivo...")
+        # 5. Click en Generar y esperar el link dinámicamente
+        print("  → Generando archivo (esperando link)...")
         page.get_by_role("button", name="Generar").click()
-        page.wait_for_timeout(4_000)
-        guardar_debug(page, "07_generar")
 
-        # 9. Descargar
-        print("  → Descargando .xls...")
+        # Esperar hasta 30s a que aparezca el link .xls
+        link_xls = page.locator("a[href*='.xls']")
+        link_xls.wait_for(timeout=30_000)
+        guardar_debug(page, "04_link_generado")
+
+        # 6. Descargar
+        print("  → Descargando...")
         with page.expect_download(timeout=30_000) as dl_info:
-            page.locator("a[href*='.xls']").first.click()
+            link_xls.first.click()
 
         download = dl_info.value
         shutil.copy(download.path(), destino)
         print(f"  ✅ Guardado: {destino}")
+
         browser.close()
 
     return destino
