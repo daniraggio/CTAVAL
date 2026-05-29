@@ -173,26 +173,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 
   <!-- RESUMEN USD -->
   <div class="sec" id="sec-resumenUSD">
-    <div class="g2" style="margin-bottom:18px">
-      <div class="card" style="padding:20px 24px">
-        <div class="card-title" style="margin-bottom:14px">Resumen del mes (USD)</div>
-        <div id="tbl-resumenUSD-kpi"></div>
-      </div>
-      <div class="card" style="padding:20px 24px">
-        <div class="card-title" style="margin-bottom:14px">Tipo de cambio activo</div>
-        <div id="tbl-resumenUSD-tc"></div>
-      </div>
+    <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio activo</div>
+      <div id="tbl-resumenUSD-tc" style="display:inline-block"></div>
     </div>
-    <div class="g2">
-      <div class="card">
-        <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — promedio horario diario</div></div></div>
-        <div class="cw"><canvas id="cEnergiaResUSD" role="img" aria-label="Energía diaria USD"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-hdr"><div><div class="card-title">CMO — Costo Marginal Operado</div><div class="card-sub">USD/MWh · promedio diario</div></div></div>
-        <div class="cw"><canvas id="cCmoResUSD" role="img" aria-label="CMO diario USD"></canvas></div>
-      </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — promedio horario diario</div></div></div>
+      <div class="cw"><canvas id="cEnergiaResUSD" role="img" aria-label="Energía diaria USD"></canvas></div>
     </div>
+    <div class="card" style="padding:20px 24px">
+      <div class="card-title" style="margin-bottom:14px">Resumen del mes (USD)</div>
+      <div id="tbl-resumenUSD-kpi"></div>
+    </div>
+    <canvas id="cCmoResUSD" style="display:none"></canvas>
   </div>
 
   <!-- ENERGÍA -->
@@ -1133,10 +1126,10 @@ function _renderResumenUSD(){
     {label:'Rem. − Costos',       val:u+fmtFull(net_usd),                     unit:'', b:true, color:net_usd>=0?'var(--success)':'var(--danger)'},
   ];
   document.getElementById('tbl-resumenUSD-kpi').innerHTML=mkResumenTable(kpiRows);
-  document.getElementById('tbl-resumenUSD-tc').innerHTML=mkResumenTable([
-    {label:'Tipo de cambio',val:'$ '+fmtN(tc,4),unit:'ARS/USD'},
-  ]);
-  _buildResumenCharts('cEnergiaResUSD',null,'cCmoResUSD',true);
+  document.getElementById('tbl-resumenUSD-tc').innerHTML=
+    `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${fmtN(tc,4)}</span>`+
+    `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD</span>`;
+  _buildResumenCharts('cEnergiaResUSD',null,null,true);
 }
 
 // ── ENERGÍA ────────────────────────────────────────────────────────────────
@@ -1525,6 +1518,17 @@ function buildCtrlRem(){
     return total;
   }
 
+  // Sum energy MWh for a machine over a date range
+  function energyRange(energyKey,desde,hasta){
+    let total=0;
+    getRows(energyKey).forEach(er=>{
+      if(er.fecha<desde||er.fecha>hasta)return;
+      if(er.h)er.h.forEach(v=>{total+=(v||0);});
+      else total+=(er.avg||0)*24;
+    });
+    return total;
+  }
+
   function renderQuincena(qNum,desde,hasta,combDecl,oymDecl){
     if(!desde||!hasta)return'';
     const rows=[];
@@ -1532,13 +1536,17 @@ function buildCtrlRem(){
     MKEYS.forEach(m=>{
       const combPlan=cvpAccumRange(COMBKEYS[m],EKEYS[m],desde,hasta);
       const oymPlan=OYMKEYS[m]?cvpAccumRange(OYMKEYS[m],EKEYS[m],desde,hasta):0;
-      const combD=combDecl[m]||0;
-      const oymD=oymDecl[m]||0;
+      const eMWh=energyRange(EKEYS[m],desde,hasta);
+      // declared is $/MWh → multiply by energy MWh of period
+      const combDpMWh=combDecl[m]||0;
+      const oymDpMWh=oymDecl[m]||0;
+      const combD=combDpMWh*eMWh;
+      const oymD=oymDpMWh*eMWh;
       const desvComb=combD-combPlan;
       const desvOym=oymD-oymPlan;
       totalCombPlan+=combPlan; totalOymPlan+=oymPlan;
       totalCombDecl+=combD;    totalOymDecl+=oymD;
-      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym});
+      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym,combDpMWh,oymDpMWh,eMWh});
     });
     const totDesvComb=totalCombDecl-totalCombPlan;
     const totDesvOym=totalOymDecl-totalOymPlan;
@@ -1549,32 +1557,41 @@ function buildCtrlRem(){
     <div style="margin-bottom:28px">
       <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">${qNum}° Quincena &nbsp;<span style="font-size:11px;color:var(--muted);font-weight:400">${desde} → ${hasta}</span></div>
       <div style="overflow-x:auto">
-        <table class="tbl" style="min-width:700px">
+        <table class="tbl" style="min-width:820px">
           <thead><tr>
             <th>Máquina</th>
-            <th class="num">CVP Comb Planilla ($)</th>
-            <th class="num">CVP Comb Declarado ($)</th>
+            <th class="num">Energía (MWh)</th>
+            <th class="num">Comb Planilla ($)</th>
+            <th class="num">Comb Decl. ($/MWh)</th>
+            <th class="num">Comb Decl. ($)</th>
             <th class="num">Desvío Comb ($)</th>
-            <th class="num">CVP O&M Planilla ($)</th>
-            <th class="num">CVP O&M Declarado ($)</th>
+            <th class="num">O&M Planilla ($)</th>
+            <th class="num">O&M Decl. ($/MWh)</th>
+            <th class="num">O&M Decl. ($)</th>
             <th class="num">Desvío O&M ($)</th>
           </tr></thead>
           <tbody>
             ${rows.map(r=>`<tr>
               <td class="lbl bold">${r.m}</td>
+              <td class="num" style="color:var(--muted)">${fmt(r.eMWh)}</td>
               <td class="num">${fmt(r.combPlan)}</td>
-              <td class="num" style="color:var(--teal)">${r.combD?fmt(r.combD):'<span style="color:var(--muted)">—</span>'}</td>
+              <td class="num" style="color:var(--teal)">${r.combDpMWh?fmtN(r.combDpMWh,2):'—'}</td>
+              <td class="num" style="color:var(--teal)">${r.combD?fmt(r.combD):'—'}</td>
               <td class="num" style="color:${clr(r.desvComb)}">${r.combD?arrow(r.desvComb)+' '+fmt(Math.abs(r.desvComb)):'—'}</td>
-              <td class="num">${r.oymPlan?fmt(r.oymPlan):'<span style="color:var(--muted)">—</span>'}</td>
-              <td class="num" style="color:var(--teal)">${r.oymD?fmt(r.oymD):'<span style="color:var(--muted)">—</span>'}</td>
+              <td class="num">${r.oymPlan?fmt(r.oymPlan):'—'}</td>
+              <td class="num" style="color:var(--teal)">${r.oymDpMWh?fmtN(r.oymDpMWh,2):'—'}</td>
+              <td class="num" style="color:var(--teal)">${r.oymD?fmt(r.oymD):'—'}</td>
               <td class="num" style="color:${clr(r.desvOym)}">${r.oymD?arrow(r.desvOym)+' '+fmt(Math.abs(r.desvOym)):'—'}</td>
             </tr>`).join('')}
             <tr class="hi" style="font-weight:700">
               <td class="lbl bold">TOTAL</td>
+              <td class="num" style="color:var(--muted)">—</td>
               <td class="num">${fmt(totalCombPlan)}</td>
+              <td class="num">—</td>
               <td class="num" style="color:var(--teal)">${fmt(totalCombDecl)}</td>
               <td class="num" style="color:${clr(totDesvComb)}">${arrow(totDesvComb)} ${fmt(Math.abs(totDesvComb))}</td>
               <td class="num">${fmt(totalOymPlan)}</td>
+              <td class="num">—</td>
               <td class="num" style="color:var(--teal)">${fmt(totalOymDecl)}</td>
               <td class="num" style="color:${clr(totDesvOym)}">${arrow(totDesvOym)} ${fmt(Math.abs(totDesvOym))}</td>
             </tr>
