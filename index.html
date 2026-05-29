@@ -501,7 +501,7 @@ function setProgress(pct) {
 }
 
 async function fetchXLS(filename) {
-  const url = GITHUB_RAW + filename;
+  const url = GITHUB_RAW + filename + '?t=' + Date.now();
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${filename}`);
   const buf = await resp.arrayBuffer();
@@ -536,7 +536,7 @@ async function loadAllData() {
   for (let i = 0; i < candidates.length; i += probeChunks) {
     const batch = candidates.slice(i, i + probeChunks);
     const results = await Promise.allSettled(
-      batch.map(f => fetch(GITHUB_RAW + f, {method:'HEAD'}))
+      batch.map(f => fetch(GITHUB_RAW + f + '?t=' + Date.now(), {method:'HEAD'}))
     );
     results.forEach((r, j) => {
       if (r.status === 'fulfilled' && r.value.ok) available.push(batch[j]);
