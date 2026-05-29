@@ -135,7 +135,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <button class="ni" onclick="showSec('costos')"><span class="nd"></span>Costos</button>
       <button class="ni" onclick="showSec('potencia')"><span class="nd"></span>Potencia</button>
       <button class="ni" onclick="showSec('remuneracion')"><span class="nd"></span>Remuneración</button>
-      <button class="ni" onclick="showSec('ctrl-rem')"><span class="nd"></span>Control Quincenas</button>
+      <button class="ni" onclick="showSec('ctrl-rem')"><span class="nd"></span>Control de Remuneraciones</button>
       <button class="ni" onclick="showSec('heatmap')"><span class="nd"></span>Perfil horario</button>
     </div>
     <div class="nav-group">
@@ -1555,7 +1555,7 @@ function buildCtrlRem(){
     const arrow=v=>v===0?'':v>0?'▲':'▼';
     return `
     <div style="margin-bottom:28px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">${qNum}° Quincena &nbsp;<span style="font-size:11px;color:var(--muted);font-weight:400">${desde} → ${hasta}</span></div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">${qNum==='M'?'Mes calendario':qNum+'° Quincena'} &nbsp;<span style="font-size:11px;color:var(--muted);font-weight:400">${desde} → ${hasta}</span></div>
       <div style="overflow-x:auto">
         <table class="tbl" style="min-width:820px">
           <thead><tr>
@@ -1604,15 +1604,45 @@ function buildCtrlRem(){
     </div>`;
   }
 
-  const q1Comb=mc.Q1Comb||{};const q1Oym=mc.Q1Oym||{};
-  const q2Comb=mc.Q2Comb||{};const q2Oym=mc.Q2Oym||{};
+  // Show all configured quincenas across all months, sorted by date
+  const allQuincenas=[];
+  Object.keys(MONTH_CFG).sort().forEach(mk=>{
+    const m=MONTH_CFG[mk];
+    const label=MONTH_META[mk]?.label||mk;
+    if(m.Q1d&&m.Q1h) allQuincenas.push({mk,label,qNum:1,desde:m.Q1d,hasta:m.Q1h,combDecl:m.Q1Comb||{},oymDecl:m.Q1Oym||{}});
+    if(m.Q2d&&m.Q2h) allQuincenas.push({mk,label,qNum:2,desde:m.Q2d,hasta:m.Q2h,combDecl:m.Q2Comb||{},oymDecl:m.Q2Oym||{}});
+  });
+  // Sort by desde date
+  allQuincenas.sort((a,b)=>a.desde.localeCompare(b.desde));
 
-  let html='';
-  if(q1ok) html+=renderQuincena(1,mc.Q1d,mc.Q1h,q1Comb,q1Oym);
-  if(q2ok) html+=renderQuincena(2,mc.Q2d,mc.Q2h,q2Comb,q2Oym);
-  if(!html)html='<div style="color:var(--muted)">Completá los valores declarados en Configuración.</div>';
+  let out='';
+  // Group by month for headers
+  let lastMk='';
+  allQuincenas.forEach(q=>{
+    if(q.mk!==lastMk){
+      out+=`<div style="font-size:16px;font-weight:700;color:var(--accent);margin:24px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px">${q.label}</div>`;
+      lastMk=q.mk;
+    }
+    out+=renderQuincena(q.qNum,q.desde,q.hasta,q.combDecl,q.oymDecl);
+  });
 
-  document.getElementById('ctrl-rem-content').innerHTML=html;
+  if(!out) out='<div style="color:var(--muted)">Completá los valores declarados en Configuración.</div>';
+
+  // Add full month section for currently selected month
+  const mkCur=MONTH;
+  const metaCur=MONTH_META[mkCur];
+  if(metaCur){
+    // Derive first and last day of the month from the data
+    const allDts=allDates(Object.values(EKEYS));
+    if(allDts.length){
+      const desde=allDts[0];
+      const hasta=allDts[allDts.length-1];
+      out+=`<div style="font-size:16px;font-weight:700;color:var(--warn);margin:24px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px">${metaCur.label} — Mes completo</div>`;
+      out+=renderQuincena('M',desde,hasta,{},{});
+    }
+  }
+
+  document.getElementById('ctrl-rem-content').innerHTML=out;
 }
 
 // ── INIT ────────────────────────────────────────────────────────────────────
