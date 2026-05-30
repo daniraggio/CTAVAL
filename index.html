@@ -702,44 +702,43 @@ function saveConfig(){
 }
 // ── GITHUB PUBLISH ──────────────────────────────────────────────────────────
 function getGHToken(){return localStorage.getItem('gh_token')||'';}
-function saveGHToken(t){localStorage.setItem('gh_token',t);}
+function saveGHToken(t){localStorage.setItem('gh_token',t.trim());}
 
-async function publishToGitHub(){
+// UTF-8 safe base64 encode
+function utf8ToB64(str){
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,(_,p)=>String.fromCharCode(parseInt(p,16))));
+}
+
+async function publishToGitHub(htmlContent){
   const token=getGHToken();
   if(!token){showGHPanel();return;}
   const btn=document.getElementById('ghPublishBtn');
-  btn.textContent='⏳ Subiendo...';btn.disabled=true;
-
-  const REPO='daniraggio/CTAVAL';
-  const BRANCH='main';
-  const FILES=[
-    {path:'index.html', content:document.documentElement.outerHTML},
-  ];
+  btn.textContent='⏳ Subiendo...';btn.disabled=true;btn.style.color='';
 
   try{
-    for(const f of FILES){
-      // Get current SHA
-      const meta=await fetch(`https://api.github.com/repos/${REPO}/contents/${f.path}?ref=${BRANCH}`,
-        {headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
-      const metaJ=await meta.json();
-      const sha=metaJ.sha;
+    const REPO='daniraggio/CTAVAL';
+    const PATH='index.html';
+    const hdrs={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'};
 
-      // Encode content
-      const encoded=btoa(unescape(encodeURIComponent(f.content)));
+    // Get current SHA
+    const metaRes=await fetch(`https://api.github.com/repos/${REPO}/contents/${PATH}`,{headers:hdrs});
+    if(!metaRes.ok){const e=await metaRes.json();throw new Error(e.message);}
+    const {sha}=await metaRes.json();
 
-      // Push
-      const res=await fetch(`https://api.github.com/repos/${REPO}/contents/${f.path}`,{
-        method:'PUT',
-        headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
-        body:JSON.stringify({message:'🤖 Dashboard update '+new Date().toISOString().slice(0,10),content:encoded,sha,branch:BRANCH})
-      });
-      if(!res.ok){const e=await res.json();throw new Error(e.message);}
-    }
+    // Push new content — use the content passed in (the generated file), not outerHTML
+    const msg='Dashboard update '+new Date().toISOString().slice(0,10);
+    const putRes=await fetch(`https://api.github.com/repos/${REPO}/contents/${PATH}`,{
+      method:'PUT', headers:hdrs,
+      body:JSON.stringify({message:msg, content:utf8ToB64(htmlContent||document.documentElement.outerHTML), sha, branch:'main'})
+    });
+    if(!putRes.ok){const e=await putRes.json();throw new Error(e.message);}
+
     btn.textContent='✅ Publicado';btn.style.background='rgba(52,211,153,.25)';btn.style.color='var(--success)';
     setTimeout(()=>{btn.textContent='☁ Publicar en GitHub';btn.style.background='';btn.style.color='';btn.disabled=false;},3000);
   }catch(e){
-    btn.textContent='❌ Error: '+e.message;btn.style.color='var(--danger)';
-    setTimeout(()=>{btn.textContent='☁ Publicar en GitHub';btn.style.background='';btn.style.color='';btn.disabled=false;},4000);
+    console.error('GitHub error:',e);
+    btn.textContent='❌ '+e.message.slice(0,50);btn.style.color='var(--danger)';
+    setTimeout(()=>{btn.textContent='☁ Publicar en GitHub';btn.style.background='';btn.style.color='';btn.disabled=false;},5000);
   }
 }
 
@@ -750,9 +749,20 @@ function showGHPanel(){
 
 function saveGHTokenFromInput(){
   const v=document.getElementById('gh-token-input').value.trim();
-  if(v){saveGHToken(v);document.getElementById('gh-token-panel').style.display='none';
-    document.getElementById('ghPublishBtn').textContent='☁ Publicar en GitHub';
-    publishToGitHub();}
+  if(!v)return;
+  // Validate token first
+  fetch('https://api.github.com/user',{headers:{'Authorization':'Bearer '+v,'Accept':'application/vnd.github+json'}})
+    .then(r=>r.json())
+    .then(u=>{
+      if(u.login){
+        saveGHToken(v);
+        document.getElementById('gh-token-panel').style.display='none';
+        document.getElementById('ghPublishBtn').textContent='☁ Publicar en GitHub';
+        alert('Token valido — usuario: '+u.login+'. Ahora podes publicar.');
+      } else {
+        alert('Token invalido: '+(u.message||JSON.stringify(u)));
+      }
+    }).catch(e=>alert('Error validando token: '+e));
 }
 
 function showCfgSaved(){
