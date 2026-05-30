@@ -948,6 +948,7 @@ function calcRemHour(m,fecha,h){
   const FRC=getFRC(fecha);
   const diff=Math.max(0,cmoFP-cvpTotal);
   const rem=cvpTotal+Math.max(RMIN,diff*CFG.FRA*FRC);
+  if(diff>0&&!calcRemHour._logged){calcRemHour._logged=true;console.log('FRC sample:',{fecha,h,FRC,diff,cmoFP,cvpTotal,RMIN,rem,CFG_FRA:CFG.FRA});}
   return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,FRC,diff,rem};
 }
 function calcRemDaily(m){
@@ -1028,7 +1029,7 @@ function buildSection(id){
 // ── RESUMEN ARS ────────────────────────────────────────────────────────────
 function mkResumenTable(rows){
   return `<table style="border-collapse:collapse;font-size:13px;width:auto">
-    <tbody>${rows.map(r=>{
+    <tbody>${rows.filter(r=>r!=null).map(r=>{
       const isTotal=r.sep||r.b;
       const valStyle=r.color?`color:${r.color}`:(isTotal?'color:var(--accent)':'color:var(--text)');
       const labelStyle=r.sep?'color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px':'';
@@ -1068,14 +1069,15 @@ function buildResumen(){
     {label:'Potencia del mes',   val:fmtN(potMes,2),       unit:'MW — promedio horario Σ 4 máquinas'},
     {sep:true,label:'Remuneraciones'},
     {label:'Rem. Energía',      val:'$ '+fmtFull(remE.TOTAL),
-      unit:(()=>{
-        const mc2=MONTH_CFG[MONTH]||{};
-        const parts=[];
-        if(mc2.Q1d&&mc2.Q1h)parts.push(`1°Q: ${mc2.Q1combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
-        if(mc2.Q2d&&mc2.Q2h)parts.push(`2°Q: ${mc2.Q2combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
-        return 'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E'+(parts.length?' — '+parts.join(' | '):'');
-      })(),
+      unit:'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E',
       color:'var(--purple)'},
+    (()=>{
+      const mc2=MONTH_CFG[MONTH]||{};
+      const parts=[];
+      if(mc2.Q1d&&mc2.Q1h)parts.push(`1°Q: ${mc2.Q1combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
+      if(mc2.Q2d&&mc2.Q2h)parts.push(`2°Q: ${mc2.Q2combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
+      return parts.length?{label:'',val:'',unit:parts.join(' | '),color:'var(--muted)'}:null;
+    })(),
     {label:'Rem. Potencia',     val:'$ '+fmtFull(remP.TOTAL*tc),     unit:'USD '+fmtFull(remP.TOTAL)+' — Σ(POT×Kp×PPAD) por hora',  color:'var(--teal)'},
     {label:'Confiabilidad',     val:'$ '+fmtFull(remConf),            unit:fmtN(potMes,1)+' MW × '+CFG.CONF+' USD × TC',  color:'var(--warn)'},
     {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora',  color:'var(--danger)'},
