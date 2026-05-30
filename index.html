@@ -1188,6 +1188,7 @@ function buildResumen(){
         const oymRows=OYMKEYS[m]?(ALL_DATA[MONTH_SNAP]?.[OYMKEYS[m]]?.rows||[]):[];
         const cmoRows=ALL_DATA[MONTH_SNAP]?.['PRECIOS-CMO']?.rows||[];
         const fpRows=ALL_DATA[MONTH_SNAP]?.[FPKEYS[m]]?.rows||[];
+        let _logged=false;
         eRows.forEach(er=>{
           const fecha=er.fecha;
           const combR=combRows.find(x=>x.fecha===fecha);
@@ -1206,9 +1207,10 @@ function buildResumen(){
             const cmoFP=(cmo||0)*(fp||1);
             const RMIN=cvpTotal<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
             const diff=Math.max(0,cmoFP-cvpTotal);
-            const frc=getFRC(fecha); // uses MONTH global — ok since we're in buildResumen context
+            const frc=getFRC(fecha);
             const frcAlt=frc===1?0.8:1;
             const remAlt=cvpTotal+Math.max(RMIN,diff*CFG.FRA*frcAlt);
+            if(!_logged&&diff>0){_logged=true;console.log('ALT sample:',{fecha,h,frc,frcAlt,diff,cvpTotal,cmoFP,RMIN,remAlt,e,contrib:remAlt*e});}
             remEalt+=remAlt*e;
           }
         });
