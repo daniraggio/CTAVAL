@@ -604,7 +604,14 @@ async function loadAllData() {
 // Per-month config (populated by loader)
 // Mutable per-month config:
 // MONTH_CFG and MONTH_META are populated dynamically by the loader
-const MONTH_CFG = {};   // {key: {TC, KP}}
+const MONTH_CFG = {};   // {key: {TC, KP, Q1combProp, Q2combProp, ...}}
+// Helper: ensure MONTH_CFG[mk] has combProp defaults applied
+function ensureCombPropDefaults(mk){
+  const mc=MONTH_CFG[mk];if(!mc)return;
+  const def=MONTH_COMBPROP_DEFAULTS?.[mk]||{};
+  if(mc.Q1combProp===undefined)mc.Q1combProp=def.Q1combProp??false;
+  if(mc.Q2combProp===undefined)mc.Q2combProp=def.Q2combProp??false;
+}
 let MONTH_META = {};    // {key: {label, badge}}
 
 // Global config
@@ -615,9 +622,23 @@ let CFG={FRA:0.15,RMIN_LO:2,RMIN_HI:7,RMIN_THR:60,CONF:2000,
 const MONTH_TC_DEFAULTS = {
   // Added by loader; user can override
 };
+// Default combProp por quincena: abril=false, mayo=true
+const MONTH_COMBPROP_DEFAULTS = {
+  '2026_04': {Q1combProp:false, Q2combProp:false},
+  '2026_05': {Q1combProp:true,  Q2combProp:true},
+};
 
 function getTC(){return MONTH_CFG[MONTH]?.TC||1200;}
 function getKP(){return MONTH_CFG[MONTH]?.KP||0.9;}
+// FRC por fecha: busca en todas las quincenas de todos los meses si la fecha cae adentro
+function getFRC(fecha){
+  for(const mk of Object.keys(MONTH_CFG)){
+    const mc=MONTH_CFG[mk];
+    if(mc.Q1d&&mc.Q1h&&fecha>=mc.Q1d&&fecha<=mc.Q1h) return mc.Q1combProp?1:0.8;
+    if(mc.Q2d&&mc.Q2h&&fecha>=mc.Q2d&&fecha<=mc.Q2h) return mc.Q2combProp?1:0.8;
+  }
+  return 0.8; // default sin quincena configurada
+}
 
 function saveConfig(){
   CFG.FRA=parseFloat(document.getElementById('cfgFRA').value)||0.15;
@@ -642,6 +663,10 @@ function saveConfig(){
     if(q1h)MONTH_CFG[mk].Q1h=q1h.value||'';
     if(q2d)MONTH_CFG[mk].Q2d=q2d.value||'';
     if(q2h)MONTH_CFG[mk].Q2h=q2h.value||'';
+    const cp1=document.getElementById(`cfgQ1combProp_${mk}`);
+    const cp2=document.getElementById(`cfgQ2combProp_${mk}`);
+    if(cp1)MONTH_CFG[mk].Q1combProp=cp1.checked;
+    if(cp2)MONTH_CFG[mk].Q2combProp=cp2.checked;
     ['TG23','TG22','TV11','TV12'].forEach(m=>{
       const c1=document.getElementById(`cfgQ1Comb${m}_${mk}`);
       const o1=document.getElementById(`cfgQ1Oym${m}_${mk}`);
@@ -921,8 +946,9 @@ function calcRemHour(m,fecha,h){
   const fp=fpRow?.h?fpRow.h[h]??fpRow.avg:fpRow?.avg??1;
   const cmoFP=(cmo||0)*(fp||1);
   const RMIN=cvpTotal<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
-  const rem=cvpTotal+Math.max(RMIN,(cmoFP-cvpTotal)*CFG.FRA);
-  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,rem};
+  const FRC=getFRC(fecha);
+  const rem=cvpTotal+Math.max(RMIN,(cmoFP-cvpTotal)*CFG.FRA*FRC);
+  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,FRC,rem};
 }
 function calcRemDaily(m){
   return allDates([EKEYS[m]]).map(fecha=>{
@@ -1056,6 +1082,30 @@ function buildResumen(){
     {label:'Total Costos',      val:'$ '+fmtFull(totalCostos),        unit:'Σ todos los costos',  b:true, color:'var(--danger)'},
     {sep:true,label:'Resultado'},
     {label:'Rem. − Costos',     val:'$ '+fmtFull(netTotal),          unit:'Total Rem. − Total Costos',  b:true, color:netTotal>=0?'var(--success)':'var(--danger)'},
+    {sep:true,label:'Control FRC'},
+    (()=>{
+      // Recalculate remE with FRC flipped for each hour
+      let remEalt=0;
+      MKEYS.forEach(m=>{
+        allDates([EKEYS[m]]).forEach(fecha=>{
+          for(let h=0;h<24;h++){
+            const r=calcRemHour(m,fecha,h);if(!r)return;
+            const frcAlt=r.FRC===1?0.8:1;
+            const remAlt=r.cvpTotal+Math.max(r.RMIN,(r.cmoFP-r.cvpTotal)*CFG.FRA*frcAlt);
+            remEalt+=remAlt*r.e;
+          }
+        });
+      });
+      const remGrandAlt=remEalt+remP.TOTAL*tc+remConf+remRPF;
+      const netAlt=remGrandAlt-totalCostos;
+      const diff=remGrandAlt-remGrand;
+      const sign=diff>=0?'+':'−';
+      const frcUsed=getFRC(allDates(Object.values(EKEYS))[0]??'');
+      return {label:'Rem. Energía si FRC fuera '+(frcUsed===1?'0,8':'1'),
+        val:'$ '+fmtFull(remEalt),
+        unit:'Neto alternativo: $ '+fmtFull(netAlt)+' ('+sign+'$ '+fmtFull(Math.abs(diff))+')',
+        color:'var(--muted)'};
+    })(),
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
   document.getElementById('tbl-resumen-tc').innerHTML=
@@ -1457,12 +1507,14 @@ function buildConfig(){
         <div style="margin:14px 0 6px;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">1° Quincena</div>
         <div class="cfg-row"><label>Desde</label><input class="cfg-inp" type="date" id="cfgQ1d_${mk}" value="${MONTH_CFG[mk].Q1d||''}" style="width:140px"></div>
         <div class="cfg-row"><label>Hasta</label><input class="cfg-inp" type="date" id="cfgQ1h_${mk}" value="${MONTH_CFG[mk].Q1h||''}" style="width:140px"></div>
+        <div class="cfg-row"><label>Combustible Propio</label><input type="checkbox" id="cfgQ1combProp_${mk}" ${MONTH_CFG[mk].Q1combProp?'checked':''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer"></div>
         ${['TG23','TG22','TV11','TV12'].map(m=>`
         <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ1Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q1Comb||{})[m]||''}" step="0.01" style="width:130px"></div>
         ${m.startsWith('TV')?'':(`<div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ1Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q1Oym||{})[m]||''}" step="0.01" style="width:130px"></div>`)}`).join('')}
         <div style="margin:14px 0 6px;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">2° Quincena</div>
         <div class="cfg-row"><label>Desde</label><input class="cfg-inp" type="date" id="cfgQ2d_${mk}" value="${MONTH_CFG[mk].Q2d||''}" style="width:140px"></div>
         <div class="cfg-row"><label>Hasta</label><input class="cfg-inp" type="date" id="cfgQ2h_${mk}" value="${MONTH_CFG[mk].Q2h||''}" style="width:140px"></div>
+        <div class="cfg-row"><label>Combustible Propio</label><input type="checkbox" id="cfgQ2combProp_${mk}" ${MONTH_CFG[mk].Q2combProp?'checked':''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer"></div>
         ${['TG23','TG22','TV11','TV12'].map(m=>`
         <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ2Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q2Comb||{})[m]||''}" step="0.01" style="width:130px"></div>
         ${m.startsWith('TV')?'':(`<div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ2Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q2Oym||{})[m]||''}" step="0.01" style="width:130px"></div>`)}`).join('')}
@@ -1766,6 +1818,8 @@ function initDashboard(loadedData) {
   Object.keys(MONTH_CFG).forEach(k => {
     const tcDefault = TC_DEFAULTS[k];
     if (tcDefault) MONTH_CFG[k].TC = tcDefault;
+    // Apply combProp defaults if not already set
+    ensureCombPropDefaults(k);
   });
 
   // Populate month selector
