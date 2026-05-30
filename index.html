@@ -1172,7 +1172,10 @@ function buildResumen(){
     (()=>{
       // Snapshot MONTH at construction time to avoid closure issues
       const MONTH_SNAP=MONTH;
-      console.log('FRC alt MONTH_SNAP:',MONTH_SNAP,'current MONTH:',MONTH);
+      // Verify base remE inline (should match remE.TOTAL)
+      let remEbase2=0;
+      MKEYS.forEach(m=>{allDates([EKEYS[m]]).forEach(fecha=>{for(let h=0;h<24;h++){const r=calcRemHour(m,fecha,h);if(r)remEbase2+=r.rem*r.e;}});});
+      console.log('FRC verify:',{MONTH_SNAP,remE_TOTAL:remE.TOTAL,remEbase2,match:Math.abs(remEbase2-remE.TOTAL)<1});
       // Recalculate remE with FRC flipped for each hour
       // calcRemHour uses MONTH global internally via getRows — we temporarily override it
       const MONTH_ORIG=MONTH;
