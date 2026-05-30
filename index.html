@@ -152,6 +152,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="page-sub" id="page-sub">Acumulados del mes</div>
     </div>
     <div class="badge" id="period-badge">–</div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:10px;position:relative">
+      <button id="ghPublishBtn" onclick="publishToGitHub()" style="background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.3);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:var(--body)">☁ Publicar en GitHub</button>
+      <div id="gh-token-panel" style="display:none;position:absolute;top:36px;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;z-index:999;flex-direction:column;gap:8px;min-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.4)">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Personal Access Token de GitHub (se guarda solo en este browser)</div>
+        <input id="gh-token-input" type="password" placeholder="github_pat_..." style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;font-family:var(--mono);width:100%;box-sizing:border-box">
+        <div style="display:flex;gap:8px">
+          <button onclick="saveGHTokenFromInput()" style="flex:1;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:7px;font-size:12px;cursor:pointer">Guardar y publicar</button>
+          <button onclick="document.getElementById('gh-token-panel').style.display='none'" style="background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:7px 12px;font-size:12px;cursor:pointer">Cancelar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- RESUMEN ARS -->
@@ -689,6 +700,61 @@ function saveConfig(){
   savePrefs();
   showCfgSaved();
 }
+// ── GITHUB PUBLISH ──────────────────────────────────────────────────────────
+function getGHToken(){return localStorage.getItem('gh_token')||'';}
+function saveGHToken(t){localStorage.setItem('gh_token',t);}
+
+async function publishToGitHub(){
+  const token=getGHToken();
+  if(!token){showGHPanel();return;}
+  const btn=document.getElementById('ghPublishBtn');
+  btn.textContent='⏳ Subiendo...';btn.disabled=true;
+
+  const REPO='daniraggio/CTAVAL';
+  const BRANCH='main';
+  const FILES=[
+    {path:'index.html', content:document.documentElement.outerHTML},
+  ];
+
+  try{
+    for(const f of FILES){
+      // Get current SHA
+      const meta=await fetch(`https://api.github.com/repos/${REPO}/contents/${f.path}?ref=${BRANCH}`,
+        {headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}});
+      const metaJ=await meta.json();
+      const sha=metaJ.sha;
+
+      // Encode content
+      const encoded=btoa(unescape(encodeURIComponent(f.content)));
+
+      // Push
+      const res=await fetch(`https://api.github.com/repos/${REPO}/contents/${f.path}`,{
+        method:'PUT',
+        headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+        body:JSON.stringify({message:'🤖 Dashboard update '+new Date().toISOString().slice(0,10),content:encoded,sha,branch:BRANCH})
+      });
+      if(!res.ok){const e=await res.json();throw new Error(e.message);}
+    }
+    btn.textContent='✅ Publicado';btn.style.background='rgba(52,211,153,.25)';btn.style.color='var(--success)';
+    setTimeout(()=>{btn.textContent='☁ Publicar en GitHub';btn.style.background='';btn.style.color='';btn.disabled=false;},3000);
+  }catch(e){
+    btn.textContent='❌ Error: '+e.message;btn.style.color='var(--danger)';
+    setTimeout(()=>{btn.textContent='☁ Publicar en GitHub';btn.style.background='';btn.style.color='';btn.disabled=false;},4000);
+  }
+}
+
+function showGHPanel(){
+  const panel=document.getElementById('gh-token-panel');
+  panel.style.display=panel.style.display==='none'?'flex':'none';
+}
+
+function saveGHTokenFromInput(){
+  const v=document.getElementById('gh-token-input').value.trim();
+  if(v){saveGHToken(v);document.getElementById('gh-token-panel').style.display='none';
+    document.getElementById('ghPublishBtn').textContent='☁ Publicar en GitHub';
+    publishToGitHub();}
+}
+
 function showCfgSaved(){
   const btn=document.getElementById('cfgApplyBtn');if(!btn)return;
   btn.textContent='✓ Aplicado';btn.style.background='rgba(52,211,153,.25)';btn.style.color='var(--success)';
@@ -1109,6 +1175,7 @@ function buildResumen(){
       const remGrandAlt=remEalt+remP.TOTAL*tc+remConf+remRPF;
       const netAlt=remGrandAlt-totalCostos;
       const diff=remGrandAlt-remGrand;
+      console.log('FRC alt check:',{remE_base:remE.TOTAL,remEalt,diff_e:remEalt-remE.TOTAL});
       const sign=diff>=0?'+':'−';
       const mc=MONTH_CFG[MONTH]||{};
       const q1frc=mc.Q1combProp?'FRC=1':'FRC=0,8';
