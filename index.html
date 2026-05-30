@@ -946,8 +946,9 @@ function calcRemHour(m,fecha,h){
   const cmoFP=(cmo||0)*(fp||1);
   const RMIN=cvpTotal<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
   const FRC=getFRC(fecha);
-  const rem=cvpTotal+Math.max(RMIN,(cmoFP-cvpTotal)*CFG.FRA*FRC);
-  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,FRC,rem};
+  const diff=Math.max(0,cmoFP-cvpTotal);
+  const rem=cvpTotal+Math.max(RMIN,diff*CFG.FRA*FRC);
+  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,FRC,diff,rem};
 }
 function calcRemDaily(m){
   return allDates([EKEYS[m]]).map(fecha=>{
@@ -1066,7 +1067,15 @@ function buildResumen(){
     {label:'Energía generada',   val:fmtFull(eMWh.TOTAL), unit:'MWh — Σ TG23+TG22+TV11+TV12'},
     {label:'Potencia del mes',   val:fmtN(potMes,2),       unit:'MW — promedio horario Σ 4 máquinas'},
     {sep:true,label:'Remuneraciones'},
-    {label:'Rem. Energía',      val:'$ '+fmtFull(remE.TOTAL),        unit:'CVP + MAX(RMIN ; (CMO×FP − CVP) × FRA) × E — por hora y máquina',  color:'var(--purple)'},
+    {label:'Rem. Energía',      val:'$ '+fmtFull(remE.TOTAL),
+      unit:(()=>{
+        const mc2=MONTH_CFG[MONTH]||{};
+        const parts=[];
+        if(mc2.Q1d&&mc2.Q1h)parts.push(`1°Q: ${mc2.Q1combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
+        if(mc2.Q2d&&mc2.Q2h)parts.push(`2°Q: ${mc2.Q2combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
+        return 'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E'+(parts.length?' — '+parts.join(' | '):'');
+      })(),
+      color:'var(--purple)'},
     {label:'Rem. Potencia',     val:'$ '+fmtFull(remP.TOTAL*tc),     unit:'USD '+fmtFull(remP.TOTAL)+' — Σ(POT×Kp×PPAD) por hora',  color:'var(--teal)'},
     {label:'Confiabilidad',     val:'$ '+fmtFull(remConf),            unit:fmtN(potMes,1)+' MW × '+CFG.CONF+' USD × TC',  color:'var(--warn)'},
     {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora',  color:'var(--danger)'},
@@ -1090,7 +1099,7 @@ function buildResumen(){
           for(let h=0;h<24;h++){
             const r=calcRemHour(m,fecha,h);if(!r)return;
             const frcAlt=r.FRC===1?0.8:1;
-            const remAlt=r.cvpTotal+Math.max(r.RMIN,(r.cmoFP-r.cvpTotal)*CFG.FRA*frcAlt);
+            const remAlt=r.cvpTotal+Math.max(r.RMIN,r.diff*CFG.FRA*frcAlt);
             remEalt+=remAlt*r.e;
           }
         });
@@ -1099,10 +1108,18 @@ function buildResumen(){
       const netAlt=remGrandAlt-totalCostos;
       const diff=remGrandAlt-remGrand;
       const sign=diff>=0?'+':'−';
-      const frcUsed=getFRC(allDates(Object.values(EKEYS))[0]??'');
-      return {label:'Rem. Energía si FRC fuera '+(frcUsed===1?'0,8':'1'),
+      const mc=MONTH_CFG[MONTH]||{};
+      const q1frc=mc.Q1combProp?'FRC=1':'FRC=0,8';
+      const q2frc=mc.Q2combProp?'FRC=1':'FRC=0,8';
+      const q1lbl=mc.Q1d&&mc.Q1h?`1°Q (${mc.Q1d.slice(5)} → ${mc.Q1h.slice(5)}): ${q1frc}`:'1°Q: sin configurar';
+      const q2lbl=mc.Q2d&&mc.Q2h?`2°Q (${mc.Q2d.slice(5)} → ${mc.Q2h.slice(5)}): ${q2frc}`:'2°Q: sin configurar';
+      const q1frcAlt=mc.Q1combProp?'FRC=0,8':'FRC=1';
+      const q2frcAlt=mc.Q2combProp?'FRC=0,8':'FRC=1';
+      const q1lblAlt=mc.Q1d&&mc.Q1h?`1°Q: ${q1frcAlt}`:'';
+      const q2lblAlt=mc.Q2d&&mc.Q2h?`2°Q: ${q2frcAlt}`:'';
+      return {label:'Rem. Energía con declaración de comb. inversa',
         val:'$ '+fmtFull(remEalt),
-        unit:'Neto alternativo: $ '+fmtFull(netAlt)+' ('+sign+'$ '+fmtFull(Math.abs(diff))+')',
+        unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diff))}) — ${[q1lblAlt,q2lblAlt].filter(Boolean).join(' | ')}`,
         color:'var(--muted)'};
     })(),
   ];
