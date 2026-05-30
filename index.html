@@ -1202,7 +1202,7 @@ function buildResumen(){
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
   document.getElementById('tbl-resumen-tc').innerHTML=
-    `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${fmtN(tc,4)}</span>`+
+    `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
     `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD</span>`;
   _buildResumenCharts('cEnergiaRes',null,null);
 }
@@ -1214,7 +1214,7 @@ function _buildResumenCharts(eChartId,_legId,cmoChartId,usdMode){
   const ds=MKEYS.map((m,i)=>({label:m,data:dates.map(d=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);return eMWh(r);}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
   const totData=dates.map(d=>{let s=0;MKEYS.forEach(m=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);if(r)s+=eMWh(r)||0;});return s;});
   ds.push({label:'TOTAL',data:totData,borderColor:'#fff',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:2,borderDash:[4,3],spanGaps:true});
-  mkChart(eChartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:12}},y:{grid:GR,ticks:TK}}}});
+  mkChart(eChartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts,tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+Math.round(ctx.parsed.y).toLocaleString('es-AR')+' MWh'}}},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:12}},y:{grid:GR,ticks:{...TK,callback:v=>Math.round(v).toLocaleString('es-AR')}}}}});
   const cmoR=getRows('PRECIOS-CMO');
   const cmoData=tc?cmoR.map(r=>r.avg/tc):cmoR.map(r=>r.avg);
   const cmoLabel=tc?'CMO USD/MWh':'CMO $/MWh';
@@ -1271,7 +1271,7 @@ function _renderResumenUSD(){
   ];
   document.getElementById('tbl-resumenUSD-kpi').innerHTML=mkResumenTable(kpiRows);
   document.getElementById('tbl-resumenUSD-tc').innerHTML=
-    `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${fmtN(tc,4)}</span>`+
+    `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
     `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD</span>`;
   _buildResumenCharts('cEnergiaResUSD',null,null,true);
 }
