@@ -1,10 +1,8 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
+<html lang="es"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Central Térmica Alto Valle</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&amp;family=DM+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d0f14;--surface:#151820;--surface2:#1c2030;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.14);--text:#e8eaf0;--muted:#7a8099;--accent:#4f8ef7;--danger:#f87171;--success:#34d399;--warn:#fbbf24;--purple:#a78bfa;--teal:#2dd4bf;--orange:#fb923c;--mono:'Space Mono',monospace;--body:'DM Sans',sans-serif;--r:10px;--rl:16px;}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -93,11 +91,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 </head>
 <body>
 
-<div id="load-screen" style="position:fixed;inset:0;background:#0d0f14;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:20px">
+<div id="load-screen" style="position: fixed; inset: 0px; background: rgb(13, 15, 20); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; gap: 20px;">
   <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:#4f8ef7;letter-spacing:.1em">Central Térmica Alto Valle</div>
-  <div id="load-status" style="font-size:13px;color:#7a8099;max-width:400px;text-align:center;line-height:1.6">Iniciando…</div>
+  <div id="load-status" style="font-size:13px;color:#7a8099;max-width:400px;text-align:center;line-height:1.6">Construyendo dashboard…</div>
   <div style="width:320px;height:4px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden">
-    <div id="load-bar" style="height:100%;width:0%;background:#4f8ef7;border-radius:4px;transition:width .3s"></div>
+    <div id="load-bar" style="height: 100%; width: 99%; background: rgb(79, 142, 247); border-radius: 4px; transition: width 0.3s;"></div>
   </div>
   <div style="font-size:11px;color:#4a5568">Descargando planillas desde GitHub…</div>
 </div>
@@ -105,13 +103,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-title">Alto Valle</div>
-    <div class="logo-sub" id="sidebar-sub">PosOperativo</div>
+    <div class="logo-sub" id="sidebar-sub">Mayo 2026</div>
   </div>
   <div class="month-select-wrap">
     <label>Período en análisis</label>
-    <select class="month-select" id="monthSel" onchange="switchMonth()">
-      <option value="">Cargando…</option>
-    </select>
+    <select class="month-select" id="monthSel" onchange="switchMonth()"><option value="2026_02">Febrero 2026</option><option value="2026_03">Marzo 2026</option><option value="2026_04">Abril 2026</option><option value="2026_05">Mayo 2026</option></select>
   </div>
   <nav class="nav">
     <div class="nav-group">
@@ -151,9 +147,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="page-title" id="page-title">Resumen general</div>
       <div class="page-sub" id="page-sub">Acumulados del mes</div>
     </div>
-    <div class="badge" id="period-badge">–</div>
+    <div class="badge" id="period-badge">Mayo 2026 · 28 días</div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:10px;position:relative">
-      <button id="ghPublishBtn" onclick="publishToGitHub()" style="background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.3);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:var(--body)">☁ Publicar en GitHub</button>
+      <button id="ghPublishBtn" onclick="publishToGitHub()" style="border: 1px solid rgba(79, 142, 247, 0.3); border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; font-family: var(--body);" disabled="">⏳ Subiendo...</button>
       <div id="gh-token-panel" style="display:none;position:absolute;top:36px;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;z-index:999;flex-direction:column;gap:8px;min-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.4)">
         <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Personal Access Token de GitHub (se guarda solo en este browser)</div>
         <input id="gh-token-input" type="password" placeholder="github_pat_..." style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;font-family:var(--mono);width:100%;box-sizing:border-box">
@@ -169,15 +165,84 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
   <div class="sec active" id="sec-resumen">
     <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
       <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio activo</div>
-      <div id="tbl-resumen-tc" style="display:inline-block"></div>
+      <div id="tbl-resumen-tc" style="display:inline-block"><span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ 1.400,0000</span><span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD</span></div>
     </div>
     <div class="card" style="margin-bottom:18px">
       <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — promedio horario diario</div></div></div>
-      <div class="cw"><canvas id="cEnergiaRes" role="img" aria-label="Energía diaria por activo"></canvas></div>
+      <div class="cw"><canvas id="cEnergiaRes" role="img" aria-label="Energía diaria por activo" width="1457" height="350" style="display: block; box-sizing: border-box; height: 260px; width: 1079px;"></canvas></div>
     </div>
     <div class="card" style="padding:20px 24px">
       <div class="card-title" style="margin-bottom:14px">Resumen del mes</div>
-      <div id="tbl-resumen-kpi"></div>
+      <div id="tbl-resumen-kpi"><table style="border-collapse:collapse;font-size:13px;width:auto">
+    <tbody><tr><td colspan="3" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px;padding:10px 0 2px;font-family:var(--body)">Producción</td></tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Energía generada</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--text)">30.561</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">MWh — Σ TG23+TG22+TV11+TV12</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Potencia del mes</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--text)">54,02</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">MW — promedio horario Σ 4 máquinas</td>
+          </tr><tr><td colspan="3" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px;padding:10px 0 2px;font-family:var(--body)">Remuneraciones</td></tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Rem. Energía</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--purple)">$ 4.113.099.796</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap"></td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--muted)"></td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">1°Q: FRC=1 (comb. propio) | 2°Q: FRC=1 (comb. propio)</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Rem. Potencia</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--teal)">$ 270.928.899</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">USD 193.521 — Σ(POT×Kp×PPAD) por hora</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Confiabilidad</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--warn)">$ 151.265.449</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">54,0 MW × 2000 USD × TC</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">RPF</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--danger)">$ 14.705.198</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--text);font-weight:600;white-space:nowrap">Total Remuneraciones</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:14px;font-weight:700;text-align:right;color:var(--accent)">$ 4.549.999.343</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">Energía + Potencia + Conf. + RPF</td>
+          </tr><tr><td colspan="3" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px;padding:10px 0 2px;font-family:var(--body)">Costos</td></tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Costo Gas</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--danger)">$ 3.229.272.185</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">Σ(CVP_Comb + CVP_Transp) × E — por hora y máquina</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Canon del Agua</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--danger)">$ 25.671.261</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">30.561 MWh × $840</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Transporte</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--danger)">$ 2</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">valor fijo configurado</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">ENRE</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--danger)">$ 552.669,00</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">valor fijo configurado (default 1.658.007 ÷ 3)</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">CAMMESA</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--danger)">$ 1.820.000</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">0,04% × Total Rem.</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Imp. Déb/Cred</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--danger)">$ 27.450.708</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">0,6% × (Rem.−ENRE) + 0,6% × (Canon+Transp.)</td>
+          </tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--text);font-weight:600;white-space:nowrap">Total Costos</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:14px;font-weight:700;text-align:right;color:var(--danger)">$ 3.284.766.825</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">Σ todos los costos</td>
+          </tr><tr><td colspan="3" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px;padding:10px 0 2px;font-family:var(--body)">Resultado</td></tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--text);font-weight:600;white-space:nowrap">Rem. − Costos</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:14px;font-weight:700;text-align:right;color:var(--success)">$ 1.265.232.518</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">Total Rem. − Total Costos</td>
+          </tr><tr><td colspan="3" style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px;padding:10px 0 2px;font-family:var(--body)">Control FRC</td></tr><tr>
+            <td style="padding:5px 20px 5px 0;font-family:var(--body);color:var(--muted);font-weight:400;white-space:nowrap">Rem. Energía con declaración de comb. inversa</td>
+            <td style="padding:5px 12px 5px 0;font-family:var(--mono);font-size:13px;font-weight:400;text-align:right;color:var(--muted)">$ 3.969.605.952</td>
+            <td style="padding:5px 0;font-family:var(--body);font-size:11px;color:var(--muted);white-space:nowrap">Neto: $ 1.121.738.674 (−$ 143.493.844) — 1°Q: FRC=0,8 | 2°Q: FRC=0,8</td>
+          </tr></tbody></table></div>
     </div>
     <canvas id="cCmoRes" style="display:none"></canvas>
   </div>
@@ -296,7 +361,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
   <div class="sec" id="sec-ctrl-rem">
     <div class="card" style="margin-bottom:18px">
       <div class="card-title" style="margin-bottom:6px">Control de Remuneraciones por Quincena</div>
-      <div class="card-sub" style="margin-bottom:14px">Ingresá los valores declarados de CVP Comb y CVP O&M por quincena en Configuración, luego revisá acá los desvíos vs. los valores de la planilla.</div>
+      <div class="card-sub" style="margin-bottom:14px">Ingresá los valores declarados de CVP Comb y CVP O&amp;M por quincena en Configuración, luego revisá acá los desvíos vs. los valores de la planilla.</div>
       <div id="ctrl-rem-content"><div style="color:var(--muted);font-size:13px">Configurá las quincenas en la sección Configuración para ver el análisis.</div></div>
     </div>
   </div>
@@ -709,7 +774,7 @@ function utf8ToB64(str){
   return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,(_,p)=>String.fromCharCode(parseInt(p,16))));
 }
 
-async function publishToGitHub(){
+async function publishToGitHub(htmlContent){
   const token=getGHToken();
   if(!token){showGHPanel();return;}
   const btn=document.getElementById('ghPublishBtn');
@@ -720,28 +785,16 @@ async function publishToGitHub(){
     const PATH='index.html';
     const hdrs={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'};
 
-    // Get current file from GitHub (SHA + raw content)
+    // Get current SHA
     const metaRes=await fetch(`https://api.github.com/repos/${REPO}/contents/${PATH}`,{headers:hdrs});
     if(!metaRes.ok){const e=await metaRes.json();throw new Error(e.message);}
-    const {sha, content:b64current}=await metaRes.json();
+    const {sha}=await metaRes.json();
 
-    // Decode current HTML
-    const currentHTML=decodeURIComponent(escape(atob(b64current.replace(/\n/g,''))));
-
-    // Inject current MONTH_CFG into the HTML as a JSON blob
-    // so config survives the publish
-    const cfgMarker='/*__SAVED_CFG__*/';
-    const cfgScript=`<script id="saved-cfg">/*__SAVED_CFG__*/${JSON.stringify(MONTH_CFG)}<\/script>`;
-    let newHTML=currentHTML;
-    // Remove old saved-cfg if present
-    newHTML=newHTML.replace(/<script id="saved-cfg">[\s\S]*?<\/script>/,'');
-    // Insert before </body>
-    newHTML=newHTML.replace('</body>',cfgScript+'</body>');
-
+    // Push new content — use the content passed in (the generated file), not outerHTML
     const msg='Dashboard update '+new Date().toISOString().slice(0,10);
     const putRes=await fetch(`https://api.github.com/repos/${REPO}/contents/${PATH}`,{
       method:'PUT', headers:hdrs,
-      body:JSON.stringify({message:msg, content:utf8ToB64(newHTML), sha, branch:'main'})
+      body:JSON.stringify({message:msg, content:utf8ToB64(htmlContent||document.documentElement.outerHTML), sha, branch:'main'})
     });
     if(!putRes.ok){const e=await putRes.json();throw new Error(e.message);}
 
@@ -762,9 +815,19 @@ function showGHPanel(){
 function saveGHTokenFromInput(){
   const v=document.getElementById('gh-token-input').value.trim();
   if(!v)return;
-  saveGHToken(v);
-  document.getElementById('gh-token-panel').style.display='none';
-  publishToGitHub();
+  // Validate token first
+  fetch('https://api.github.com/user',{headers:{'Authorization':'Bearer '+v,'Accept':'application/vnd.github+json'}})
+    .then(r=>r.json())
+    .then(u=>{
+      if(u.login){
+        saveGHToken(v);
+        document.getElementById('gh-token-panel').style.display='none';
+        document.getElementById('ghPublishBtn').textContent='☁ Publicar en GitHub';
+        alert('Token valido — usuario: '+u.login+'. Ahora podes publicar.');
+      } else {
+        alert('Token invalido: '+(u.message||JSON.stringify(u)));
+      }
+    }).catch(e=>alert('Error validando token: '+e));
 }
 
 function showCfgSaved(){
@@ -1979,5 +2042,6 @@ window.showSec=showSec;window.setETab=setETab;window.setRemTab=setRemTab;window.
   }
 })();
 </script>
-</body>
-</html>
+
+
+</body></html>
