@@ -1122,6 +1122,17 @@ function mkResumenTable(rows){
 function buildResumen(){
   const {eMWh}=getComputedTotals();
   const remE=calcRemEnergia();
+  // Calculate alt remE (FRC inverted) here, same context as remE
+  let _remEalt=0;
+  MKEYS.forEach(m=>{
+    allDates([EKEYS[m]]).forEach(fecha=>{
+      for(let h=0;h<24;h++){
+        const r=calcRemHour(m,fecha,h);if(!r)continue;
+        const fA=r.FRC===1?0.8:1;
+        _remEalt+=(r.cvpTotal+Math.max(r.RMIN,r.diff*CFG.FRA*fA))*r.e;
+      }
+    });
+  });
   const remP=calcRemPotencia();
   const potMes=calcPotMes();
   const tc=getTC();
@@ -1170,74 +1181,20 @@ function buildResumen(){
     {label:'Rem. − Costos',     val:'$ '+fmtFull(netTotal),          unit:'Total Rem. − Total Costos',  b:true, color:netTotal>=0?'var(--success)':'var(--danger)'},
     {sep:true,label:'Control FRC'},
     (()=>{
-      // Snapshot MONTH at construction time to avoid closure issues
-      const MONTH_SNAP=MONTH;
-      // Verify: use exact same loop as calcRemEnergia but with frcAlt
-      let remEbase2=0,remEalt2=0;
-      MKEYS.forEach(m=>{allDates([EKEYS[m]]).forEach(fecha=>{for(let h=0;h<24;h++){
-        const r=calcRemHour(m,fecha,h);if(!r)return;
-        remEbase2+=r.rem*r.e;
-        const frcAlt=r.FRC===1?0.8:1;
-        const remAlt=r.cvpTotal+Math.max(r.RMIN,r.diff*CFG.FRA*frcAlt);
-        remEalt2+=remAlt*r.e;
-      }});});
-      console.log('FRC verify:',{remE_TOTAL:remE.TOTAL,remEbase2,remEalt2,diff:remEalt2-remEbase2,match:Math.abs(remEbase2-remE.TOTAL)<1});
-      // Recalculate remE with FRC flipped for each hour
-      // calcRemHour uses MONTH global internally via getRows — we temporarily override it
-      const MONTH_ORIG=MONTH;
-      // Don't change MONTH — instead inline the calculation with explicit month
-      let remEalt=0;
-      MKEYS.forEach(m=>{
-        const eRows=ALL_DATA[MONTH_SNAP]?.[EKEYS[m]]?.rows||[];
-        const combRows=ALL_DATA[MONTH_SNAP]?.[COMBKEYS[m]]?.rows||[];
-        const transpRows=TRANSPKEYS[m]?(ALL_DATA[MONTH_SNAP]?.[TRANSPKEYS[m]]?.rows||[]):[];
-        const oymRows=OYMKEYS[m]?(ALL_DATA[MONTH_SNAP]?.[OYMKEYS[m]]?.rows||[]):[];
-        const cmoRows=ALL_DATA[MONTH_SNAP]?.['PRECIOS-CMO']?.rows||[];
-        const fpRows=ALL_DATA[MONTH_SNAP]?.[FPKEYS[m]]?.rows||[];
-        let _logged=false;
-        eRows.forEach(er=>{
-          const fecha=er.fecha;
-          const combR=combRows.find(x=>x.fecha===fecha);
-          const transpR=transpRows.find(x=>x.fecha===fecha);
-          const oymR=oymRows.find(x=>x.fecha===fecha);
-          const cmoR=cmoRows.find(x=>x.fecha===fecha);
-          const fpR=fpRows.find(x=>x.fecha===fecha);
-          for(let h=0;h<24;h++){
-            const e=(er.h?er.h[h]:er.avg)||0; if(!e||e<=0)continue;
-            const combV=combR?.h?combR.h[h]??combR.avg:combR?.avg??0;
-            const transpV=transpR?.h?transpR.h[h]??transpR.avg:transpR?.avg??0;
-            const oymV=oymR?.h?oymR.h[h]??oymR.avg:oymR?.avg??0;
-            const cvpTotal=(combV||0)+(transpV||0)+(oymV||0);
-            const cmo=cmoR?.h?cmoR.h[h]??cmoR.avg:cmoR?.avg??0;
-            const fp=fpR?.h?fpR.h[h]??fpR.avg:fpR?.avg??1;
-            const cmoFP=(cmo||0)*(fp||1);
-            const RMIN=cvpTotal<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
-            const diff=Math.max(0,cmoFP-cvpTotal);
-            const frc=getFRC(fecha);
-            const frcAlt=frc===1?0.8:1;
-            const remAlt=cvpTotal+Math.max(RMIN,diff*CFG.FRA*frcAlt);
-            if(!_logged&&diff>0){_logged=true;console.log('ALT sample:',{fecha,h,frc,frcAlt,diff,cvpTotal,cmoFP,RMIN,remAlt,e,contrib:remAlt*e});}
-            remEalt+=remAlt*e;
-          }
-        });
-      });
-      const remGrandAlt=remEalt+remP.TOTAL*tc+remConf+remRPF;
-      const netAlt=remGrandAlt-totalCostos;
-      const diff=remGrandAlt-remGrand;
-
-      const sign=diff>=0?'+':'−';
       const mc=MONTH_CFG[MONTH]||{};
-      const q1frc=mc.Q1combProp?'FRC=1':'FRC=0,8';
-      const q2frc=mc.Q2combProp?'FRC=1':'FRC=0,8';
-      const q1lbl=mc.Q1d&&mc.Q1h?`1°Q (${mc.Q1d.slice(5)} → ${mc.Q1h.slice(5)}): ${q1frc}`:'1°Q: sin configurar';
-      const q2lbl=mc.Q2d&&mc.Q2h?`2°Q (${mc.Q2d.slice(5)} → ${mc.Q2h.slice(5)}): ${q2frc}`:'2°Q: sin configurar';
+      const remGrandAlt=_remEalt+remP.TOTAL*tc+remConf+remRPF;
+      const netAlt=remGrandAlt-totalCostos;
+      const diffAlt=remGrandAlt-remGrand;
+      const sign=diffAlt>=0?'+':'−';
       const q1frcAlt=mc.Q1combProp?'FRC=0,8':'FRC=1';
       const q2frcAlt=mc.Q2combProp?'FRC=0,8':'FRC=1';
-      const q1lblAlt=mc.Q1d&&mc.Q1h?`1°Q: ${q1frcAlt}`:'';
-      const q2lblAlt=mc.Q2d&&mc.Q2h?`2°Q: ${q2frcAlt}`:'';
+      const lblAlt=[
+        mc.Q1d&&mc.Q1h?`1°Q: ${q1frcAlt}`:'',
+        mc.Q2d&&mc.Q2h?`2°Q: ${q2frcAlt}`:'',
+      ].filter(Boolean).join(' | ');
       return {label:'Rem. Energía con declaración de comb. inversa',
-        val:'$ '+fmtFull(remEalt),
-        unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diff))}) — ${[q1lblAlt,q2lblAlt].filter(Boolean).join(' | ')}`,
+        val:'$ '+fmtFull(_remEalt),
+        unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diffAlt))}) — ${lblAlt}`,
         color:'var(--muted)'};
     })(),
   ];
@@ -1911,7 +1868,6 @@ async function loadRepoConfig() {
     const r = await fetch(CONFIG_URL + '?t=' + Date.now());
     if (!r.ok) return null;
     const prefs = await r.json();
-    console.log('Loaded config.json from repo');
     return prefs;
   } catch(e) { return null; }
 }
@@ -1941,7 +1897,6 @@ function initDashboard(loadedData) {
   // Debug: log loaded months and row counts
   Object.keys(ALL_DATA).forEach(mk => {
     const e = ALL_DATA[mk]['AVALTG23-ENERGIA'];
-    console.log('Loaded', mk, '— TG23 rows:', e?.rows?.length ?? 'MISSING');
   });
   Object.assign(MONTH_META, loadedData.MONTH_META_DYN);
   Object.assign(MONTH_CFG, loadedData.MONTH_CFG_DYN);
