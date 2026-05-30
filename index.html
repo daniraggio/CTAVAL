@@ -630,14 +630,13 @@ const MONTH_COMBPROP_DEFAULTS = {
 
 function getTC(){return MONTH_CFG[MONTH]?.TC||1200;}
 function getKP(){return MONTH_CFG[MONTH]?.KP||0.9;}
-// FRC por fecha: busca en todas las quincenas de todos los meses si la fecha cae adentro
+// FRC por fecha: busca solo en las quincenas del mes seleccionado
 function getFRC(fecha){
-  for(const mk of Object.keys(MONTH_CFG)){
-    const mc=MONTH_CFG[mk];
-    if(mc.Q1d&&mc.Q1h&&fecha>=mc.Q1d&&fecha<=mc.Q1h) return mc.Q1combProp?1:0.8;
-    if(mc.Q2d&&mc.Q2h&&fecha>=mc.Q2d&&fecha<=mc.Q2h) return mc.Q2combProp?1:0.8;
-  }
-  return 0.8; // default sin quincena configurada
+  const mc=MONTH_CFG[MONTH];
+  if(!mc)return 0.8;
+  if(mc.Q1d&&mc.Q1h&&fecha>=mc.Q1d&&fecha<=mc.Q1h) return mc.Q1combProp?1:0.8;
+  if(mc.Q2d&&mc.Q2h&&fecha>=mc.Q2d&&fecha<=mc.Q2h) return mc.Q2combProp?1:0.8;
+  return 0.8; // fecha no cubre ninguna quincena configurada
 }
 
 function saveConfig(){
