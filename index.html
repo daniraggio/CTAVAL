@@ -411,6 +411,7 @@ const DAYS_IN = {'01':31,'02':28,'03':31,'04':30,'05':31,'06':30,
 const SHEETS_NEEDED = [
   'AVALTG23-ENERGIA','AVALTG22-ENERGIA','AVALTV11-ENERGIA','AVALTV12-ENERGIA',
   'AVALTG23-CVPCOMBREM-GX','AVALTG22-CVPCOMBREM-GX','AVALTV11-CVPCOMBREM-GX','AVALTV12-CVPCOMBREM-GX',
+  'AVALTG23-CVPCOMBDESC-GX','AVALTG22-CVPCOMBDESC-GX','AVALTV11-CVPCOMBDESC-GX','AVALTV12-CVPCOMBDESC-GX',
   'AVALTG22-CVPTRANSPREMPROV-GX','AVALTG23-CVPTRANSPREMPROV-GX',
   'AVALTG22-CVPOYMREM-GX','AVALTG23-CVPOYMREM-GX','PRECIOS-CMO',
   'AVALTG23-FACTOR_PERDIDAS','AVALTG22-FACTOR_PERDIDAS','AVALTV11-FACTOR_PERDIDAS','AVALTV12-FACTOR_PERDIDAS',
@@ -827,6 +828,7 @@ function cvpAccum(priceKey,energyKey){
 const MKEYS=['TG23','TG22','TV11','TV12'];
 const EKEYS={TG23:'AVALTG23-ENERGIA',TG22:'AVALTG22-ENERGIA',TV11:'AVALTV11-ENERGIA',TV12:'AVALTV12-ENERGIA'};
 const COMBKEYS={TG23:'AVALTG23-CVPCOMBREM-GX',TG22:'AVALTG22-CVPCOMBREM-GX',TV11:'AVALTV11-CVPCOMBREM-GX',TV12:'AVALTV12-CVPCOMBREM-GX'};
+const DESCKEYS={TG23:'AVALTG23-CVPCOMBDESC-GX',TG22:'AVALTG22-CVPCOMBDESC-GX',TV11:'AVALTV11-CVPCOMBDESC-GX',TV12:'AVALTV12-CVPCOMBDESC-GX'};
 const TRANSPKEYS={TG22:'AVALTG22-CVPTRANSPREMPROV-GX',TG23:'AVALTG23-CVPTRANSPREMPROV-GX'};
 const OYMKEYS={TG22:'AVALTG22-CVPOYMREM-GX',TG23:'AVALTG23-CVPOYMREM-GX'};
 const FPKEYS={TG23:'AVALTG23-FACTOR_PERDIDAS',TG22:'AVALTG22-FACTOR_PERDIDAS',TV11:'AVALTV11-FACTOR_PERDIDAS',TV12:'AVALTV12-FACTOR_PERDIDAS'};
@@ -1680,24 +1682,25 @@ function buildCtrlRem(){
   function renderQuincena(qNum,desde,hasta,combDecl,oymDecl){
     if(!desde||!hasta)return'';
     const rows=[];
-    let totalCombPlan=0,totalOymPlan=0,totalCombDecl=0,totalOymDecl=0;
+    let totalCombPlan=0,totalOymPlan=0,totalCombDecl=0,totalOymDecl=0,totalDescPlan=0;
 
     MKEYS.forEach(m=>{
       const combPlan=cvpAccumRange(COMBKEYS[m],EKEYS[m],desde,hasta);
       const TV=m.startsWith('TV');
       const oymPlan=(!TV&&OYMKEYS[m])?cvpAccumRange(OYMKEYS[m],EKEYS[m],desde,hasta):0;
       const eMWh=energyRange(EKEYS[m],desde,hasta);
+      const descPlan=DESCKEYS[m]?cvpAccumRange(DESCKEYS[m],EKEYS[m],desde,hasta):0;
       const combDpMWh=combDecl[m]||0;
       const oymDpMWh=TV?0:(oymDecl[m]||0);
-      // Simple: declared = price x total energy (no ciclo combinado adjustment)
       const combD=combDpMWh*eMWh;
       const oymD=TV?0:oymDpMWh*eMWh;
       const desvComb=combD-combPlan;
       const desvOym=TV?null:(oymD-oymPlan);
       totalCombPlan+=combPlan;
       totalCombDecl+=combD;
+      totalDescPlan+=descPlan;
       if(!TV){ totalOymPlan+=oymPlan; totalOymDecl+=oymD; }
-      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym,eMWh,TV});
+      rows.push({m,combPlan,oymPlan,combD,oymD,desvComb,desvOym,eMWh,TV,descPlan});
     });
     const totDesvComb=totalCombDecl-totalCombPlan;
     const totDesvOym=totalOymDecl-totalOymPlan;
@@ -1716,6 +1719,7 @@ function buildCtrlRem(){
             <th>Máquina</th>
             <th class="num">Energía (MWh)</th>
             <th class="num">Comb Posoperativo ($)</th>
+            <th class="num" style="color:var(--teal)">Descuento Comb ($)</th>
             <th class="num">Comb Decl. ($)</th>
             <th class="num">Desvío Comb ($)</th>
             <th class="num">O&M Planilla ($)</th>
@@ -1727,6 +1731,7 @@ function buildCtrlRem(){
               <td class="lbl bold">${r.m}</td>
               <td class="num">${fmt(r.eMWh)}</td>
               <td class="num">${fmt(r.combPlan)}</td>
+              <td class="num" style="color:var(--teal)">${fmt(r.descPlan)}</td>
               <td class="num">${fmt(r.combD)}</td>
               <td class="num" style="color:${clr(r.desvComb)};font-weight:600">${arrow(r.desvComb)} ${fmt(Math.abs(r.desvComb))}</td>
               ${r.TV?
@@ -1739,6 +1744,7 @@ function buildCtrlRem(){
               <td class="lbl bold">TOTAL</td>
               <td class="num">—</td>
               <td class="num">${fmt(totalCombPlan)}</td>
+              <td class="num" style="color:var(--teal)">${fmt(totalDescPlan)}</td>
               <td class="num">${fmt(totalCombDecl)}</td>
               <td class="num" style="color:${clr(totDesvComb)};font-weight:700">${arrow(totDesvComb)} ${fmt(Math.abs(totDesvComb))}</td>
               <td class="num">${fmt(totalOymPlan)}</td>
