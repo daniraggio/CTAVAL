@@ -1109,7 +1109,9 @@ function mkResumenTable(rows){
   return `<table style="border-collapse:collapse;font-size:13px;width:auto">
     <tbody>${rows.filter(r=>r!=null).map(r=>{
       const isTotal=r.sep||r.b;
-      const valStyle=r.color?`color:${r.color}`:(isTotal?'color:var(--accent)':'color:var(--text)');
+      // All values white except the final result row (Rem. - Costos)
+      const isResult=r.result;
+      const valStyle=isResult?`color:${r.color||'var(--success)'}`:('color:var(--text)');
       const labelStyle=r.sep?'color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:14px':'';
       return r.sep
         ? `<tr><td colspan="3" style="${labelStyle};padding:10px 0 2px;font-family:var(--body)">${r.label}</td></tr>`
@@ -1155,11 +1157,11 @@ function buildResumen(){
   const kpiRows=[
     {sep:true,label:'Producción'},
     {label:'Energía generada',   val:fmtFull(eMWh.TOTAL), unit:'MWh — Σ TG23+TG22+TV11+TV12'},
-    {label:'Potencia del mes',   val:fmtN(potMes,2),       unit:'MW — promedio horario Σ 4 máquinas'},
+    {label:'Potencia del mes',   val:fmtFull(potMes),       unit:'MW — promedio horario Σ 4 máquinas'},
     {sep:true,label:'Remuneraciones'},
     {label:'Rem. Energía',      val:'$ '+fmtFull(remE.TOTAL),
       unit:'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E',
-      color:'var(--purple)'},
+      },
     (()=>{
       const mc2=MONTH_CFG[MONTH]||{};
       const parts=[];
@@ -1167,20 +1169,20 @@ function buildResumen(){
       if(mc2.Q2d&&mc2.Q2h)parts.push(`2°Q: ${mc2.Q2combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
       return parts.length?{label:'',val:'',unit:parts.join(' | '),color:'var(--muted)'}:null;
     })(),
-    {label:'Rem. Potencia',     val:'$ '+fmtFull(remP.TOTAL*tc),     unit:'USD '+fmtFull(remP.TOTAL)+' — Σ(POT×Kp×PPAD) por hora',  color:'var(--teal)'},
-    {label:'Confiabilidad',     val:'$ '+fmtFull(remConf),            unit:fmtN(potMes,1)+' MW × '+CFG.CONF+' USD × TC',  color:'var(--warn)'},
-    {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora',  color:'var(--danger)'},
-    {label:'Total Remuneraciones',val:'$ '+fmtFull(remGrand),         unit:'Energía + Potencia + Conf. + RPF',  b:true, color:'var(--accent)'},
+    {label:'Rem. Potencia',     val:'$ '+fmtFull(remP.TOTAL*tc),     unit:'USD '+fmtFull(remP.TOTAL)+' — Σ(POT×Kp×PPAD) por hora',  },
+    {label:'Confiabilidad',     val:'$ '+fmtFull(remConf),            unit:fmtN(potMes,1)+' MW × '+CFG.CONF+' USD × TC',  },
+    {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora'},
+    {label:'Total Remuneraciones',val:'$ '+fmtFull(remGrand),         unit:'Energía + Potencia + Conf. + RPF',  b:true},
     {sep:true,label:'Costos'},
-    {label:'Costo Gas',         val:'$ '+fmtFull(costoGas.TOTAL),     unit:'Σ(CVP_Comb + CVP_Transp) × E — por hora y máquina',  color:'var(--danger)'},
-    {label:'Canon del Agua',    val:'$ '+fmtFull(canonAgua),          unit:fmtFull(eMWh.TOTAL)+' MWh × $'+CFG.CANON_AGUA, color:'var(--danger)'},
-    {label:'Transporte',        val:'$ '+fmtFull(transporte),         unit:'valor fijo configurado',  color:'var(--danger)'},
-    {label:'ENRE',              val:'$ '+fmtN(enre,2),                unit:'valor fijo configurado (default 1.658.007 ÷ 3)',  color:'var(--danger)'},
-    {label:'CAMMESA',           val:'$ '+fmtFull(cammesa),            unit:'0,04% × Total Rem.',  color:'var(--danger)'},
+    {label:'Costo Gas',         val:'$ '+fmtFull(costoGas.TOTAL),     unit:'Σ(CVP_Comb + CVP_Transp) × E — por hora y máquina',  },
+    {label:'Canon del Agua',    val:'$ '+fmtFull(canonAgua),          unit:fmtFull(eMWh.TOTAL)+' MWh × $'+CFG.CANON_AGUA, },
+    {label:'Transporte',        val:'$ '+fmtFull(transporte),         unit:'valor fijo configurado',  },
+    {label:'ENRE',              val:'$ '+fmtFull(enre),                unit:'valor fijo configurado (default 1.658.007 ÷ 3)'},
+    {label:'CAMMESA',           val:'$ '+fmtFull(cammesa),            unit:'0,04% × Total Rem.',  },
     {label:'Imp. Déb/Cred',     val:'$ '+fmtFull(impDebCred),         unit:'0,6% × (Rem.−ENRE) + 0,6% × (Canon+Transp.)',  color:'var(--danger)'},
-    {label:'Total Costos',      val:'$ '+fmtFull(totalCostos),        unit:'Σ todos los costos',  b:true, color:'var(--danger)'},
+    {label:'Total Costos',      val:'$ '+fmtFull(totalCostos),        unit:'Σ todos los costos',  b:true},
     {sep:true,label:'Resultado'},
-    {label:'Rem. − Costos',     val:'$ '+fmtFull(netTotal),          unit:'Total Rem. − Total Costos',  b:true, color:netTotal>=0?'var(--success)':'var(--danger)'},
+    {label:'Rem. − Costos',     val:'$ '+fmtFull(netTotal),          unit:'Total Rem. − Total Costos',  b:true, result:true, color:netTotal>=0?'var(--success)':'var(--danger)'},
     {sep:true,label:'Control FRC'},
     (()=>{
       const mc=MONTH_CFG[MONTH]||{};
@@ -1197,7 +1199,7 @@ function buildResumen(){
       return {label:'Rem. Energía con declaración de comb. inversa',
         val:'$ '+fmtFull(_remEalt),
         unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diffAlt))}) — ${lblAlt}`,
-        color:'var(--muted)'};
+        };
     })(),
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
@@ -1253,21 +1255,21 @@ function _renderResumenUSD(){
     {label:'Energía generada',    val:fmtFull(eMWh.TOTAL),                   unit:'MWh'},
     {label:'Potencia del mes',    val:fmtN(potMes,2),                         unit:'MW'},
     {sep:true,label:'Remuneraciones'},
-    {label:'Rem. Energía',        val:u+fmtFull(toU(remE.TOTAL)),             unit:'', color:'var(--purple)'},
-    {label:'Rem. Potencia',       val:u+fmtFull(remP.TOTAL),                  unit:'($ '+fmtFull(remP.TOTAL*tc)+')', color:'var(--teal)'},
-    {label:'Confiabilidad',       val:u+fmtFull(remConf),                     unit:'', color:'var(--warn)'},
-    {label:'RPF',                 val:u+fmtFull(remRPF_usd),                  unit:'', color:'var(--danger)'},
-    {label:'Total Remuneraciones',val:u+fmtFull(remGrand_usd),                unit:'', b:true, color:'var(--accent)'},
+    {label:'Rem. Energía',        val:u+fmtFull(toU(remE.TOTAL)),             unit:'', },
+    {label:'Rem. Potencia',       val:u+fmtFull(remP.TOTAL),                  unit:'($ '+fmtFull(remP.TOTAL*tc)+')', },
+    {label:'Confiabilidad',       val:u+fmtFull(remConf),                     unit:'', },
+    {label:'RPF',                 val:u+fmtFull(remRPF_usd),                  unit:''},
+    {label:'Total Remuneraciones',val:u+fmtFull(remGrand_usd),                unit:'', b:true},
     {sep:true,label:'Costos'},
-    {label:'Costo Gas',           val:u+fmtFull(costoGas_usd),                unit:'', color:'var(--danger)'},
-    {label:'Canon del Agua',      val:u+fmtFull(canonAgua_usd),               unit:'('+fmtFull(eMWh.TOTAL)+' MWh × USD '+fmtN(CFG.CANON_AGUA/tc,2)+')', color:'var(--danger)'},
-    {label:'Transporte',          val:u+fmtN(transporte_usd,2),               unit:'', color:'var(--danger)'},
-    {label:'ENRE',                val:u+fmtN(enre_usd,2),                     unit:'', color:'var(--danger)'},
-    {label:'CAMMESA',             val:u+fmtFull(cammesa_usd),                 unit:'(0,04% × Total Rem.)', color:'var(--danger)'},
-    {label:'Imp. Déb/Cred',       val:u+fmtFull(impDebCred_usd),              unit:'', color:'var(--danger)'},
-    {label:'Total Costos',        val:u+fmtFull(totalCostos_usd),             unit:'', b:true, color:'var(--danger)'},
+    {label:'Costo Gas',           val:u+fmtFull(costoGas_usd),                unit:'', },
+    {label:'Canon del Agua',      val:u+fmtFull(canonAgua_usd),               unit:'('+fmtFull(eMWh.TOTAL)+' MWh × USD '+fmtN(CFG.CANON_AGUA/tc,2)+')', },
+    {label:'Transporte',          val:u+fmtN(transporte_usd,2),               unit:'', },
+    {label:'ENRE',                val:u+fmtN(enre_usd,2),                     unit:'', },
+    {label:'CAMMESA',             val:u+fmtFull(cammesa_usd),                 unit:'(0,04% × Total Rem.)', },
+    {label:'Imp. Déb/Cred',       val:u+fmtFull(impDebCred_usd),              unit:''},
+    {label:'Total Costos',        val:u+fmtFull(totalCostos_usd),             unit:'', b:true},
     {sep:true,label:'Resultado'},
-    {label:'Rem. − Costos',       val:u+fmtFull(net_usd),                     unit:'', b:true, color:net_usd>=0?'var(--success)':'var(--danger)'},
+    {label:'Rem. − Costos',       val:u+fmtFull(net_usd),                     unit:'', b:true, result:true, color:net_usd>=0?'var(--success)':'var(--danger)'},
   ];
   document.getElementById('tbl-resumenUSD-kpi').innerHTML=mkResumenTable(kpiRows);
   document.getElementById('tbl-resumenUSD-tc').innerHTML=
