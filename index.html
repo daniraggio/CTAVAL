@@ -1719,7 +1719,7 @@ function buildCtrlRem(){
             <th>Máquina</th>
             <th class="num">Energía (MWh)</th>
             <th class="num">Comb Posoperativo ($)</th>
-            <th class="num" style="color:var(--teal)">Descuento Comb ($)</th>
+            <th class="num" style="color:var(--accent)">Descuento Comb ($)</th>
             <th class="num">Comb Decl. ($)</th>
             <th class="num">Desvío Comb ($)</th>
             <th class="num">O&M Planilla ($)</th>
@@ -1731,7 +1731,7 @@ function buildCtrlRem(){
               <td class="lbl bold">${r.m}</td>
               <td class="num">${fmt(r.eMWh)}</td>
               <td class="num">${fmt(r.combPlan)}</td>
-              <td class="num" style="color:var(--teal)">${fmt(r.descPlan)}</td>
+              <td class="num" style="color:var(--accent)">${fmt(r.descPlan)}</td>
               <td class="num">${fmt(r.combD)}</td>
               <td class="num" style="color:${clr(r.desvComb)};font-weight:600">${arrow(r.desvComb)} ${fmt(Math.abs(r.desvComb))}</td>
               ${r.TV?
@@ -1744,7 +1744,7 @@ function buildCtrlRem(){
               <td class="lbl bold">TOTAL</td>
               <td class="num">—</td>
               <td class="num">${fmt(totalCombPlan)}</td>
-              <td class="num" style="color:var(--teal)">${fmt(totalDescPlan)}</td>
+              <td class="num" style="color:var(--accent)">${fmt(totalDescPlan)}</td>
               <td class="num">${fmt(totalCombDecl)}</td>
               <td class="num" style="color:${clr(totDesvComb)};font-weight:700">${arrow(totDesvComb)} ${fmt(Math.abs(totDesvComb))}</td>
               <td class="num">${fmt(totalOymPlan)}</td>
