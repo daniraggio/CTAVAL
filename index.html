@@ -1180,7 +1180,9 @@ function buildResumen(){
       for(let h=0;h<24;h++){
         const r=calcRemHour(m,fecha,h);if(!r)continue;
         const fA=r.FRC===1?0.8:1;
-        _remEalt+=(r.cvpTotal+Math.max(r.RMIN,r.diff*CFG.FRA*fA))*r.e;
+        // COP hours: only CVP, no RMIN no renta
+        const remAlt=r.isCOP?r.cvpTotal:(r.cvpTotal+Math.max(r.RMIN,r.diff*CFG.FRA*fA));
+        _remEalt+=remAlt*r.e;
       }
     });
   });
