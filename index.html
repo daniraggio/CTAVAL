@@ -1247,7 +1247,7 @@ function buildResumen(){
       return {label:'Rem. Energía con declaración de comb. inversa',
         val:'$ '+fmtFull(_remEalt),
         unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diffAlt))}) — ${lblAlt}`,
-        };
+        result:true, color:netAlt>=0?'var(--success)':'var(--danger)'};
     })(),
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
