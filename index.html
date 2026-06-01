@@ -1057,9 +1057,12 @@ function calcRemHour(m,fecha,h){
   const RMIN=cvpTotal<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
   const FRC=getFRC(fecha);
   const diff=Math.max(0,cmoFP-cvpTotal);
-  const rem=cvpTotal+Math.max(RMIN,diff*CFG.FRA*FRC);
-  if(diff>0&&!calcRemHour._logged){calcRemHour._logged=true;console.log('FRC sample:',{fecha,h,FRC,diff,cmoFP,cvpTotal,RMIN,rem,CFG_FRA:CFG.FRA});}
-  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,FRC,diff,rem};
+  // Check operational state: if COP, only CVP is remunerated (no renta margin)
+  const estRow=getRows(ESTKEYS[m]).find(x=>x.fecha===fecha);
+  const estH=estRow?.h?estRow.h[h]:'===';
+  const isCOP=estH==='COP';
+  const rem=isCOP?cvpTotal:(cvpTotal+Math.max(RMIN,diff*CFG.FRA*FRC));
+  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,FRC,diff,rem,isCOP};
 }
 function calcRemDaily(m){
   return allDates([EKEYS[m]]).map(fecha=>{
@@ -1159,6 +1162,17 @@ function mkResumenTable(rows){
 function buildResumen(){
   const {eMWh}=getComputedTotals();
   const remE=calcRemEnergia();
+  // Count COP hours across all machines for info
+  let _copHours=0;
+  MKEYS.forEach(m=>{
+    allDates([EKEYS[m]]).forEach(fecha=>{
+      const estRows=getRows(ESTKEYS[m]).find(x=>x.fecha===fecha);
+      if(!estRows)return;
+      const hrs=estRows.h||[];
+      hrs.forEach(v=>{if(v==='COP')_copHours++;});
+    });
+  });
+
   // Calculate alt remE (FRC inverted) here, same context as remE
   let _remEalt=0;
   MKEYS.forEach(m=>{
@@ -1200,8 +1214,9 @@ function buildResumen(){
       const parts=[];
       if(mc2.Q1d&&mc2.Q1h)parts.push(`1°Q: ${mc2.Q1combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
       if(mc2.Q2d&&mc2.Q2h)parts.push(`2°Q: ${mc2.Q2combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
-      return parts.length?{label:'',val:'',unit:parts.join(' | '),color:'var(--muted)'}:null;
+      return parts.length?{label:'',val:'',unit:parts.join(' | ')}:null;
     })(),
+    {label:'',val:'',unit:`Horas en estado COP: ${_copHours.toLocaleString('es-AR')} (en estas horas rem. = CVP sin renta)`},
     {label:'Rem. Potencia',     val:'$ '+fmtFull(remP.TOTAL*tc),     unit:'USD '+fmtFull(remP.TOTAL)+' — Σ(POT×Kp×PPAD) por hora',  },
     {label:'Confiabilidad',     val:'$ '+fmtFull(remConf),            unit:fmtN(potMes,1)+' MW × '+CFG.CONF+' USD × TC',  },
     {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora'},
