@@ -136,6 +136,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <button class="ni" onclick="showSec('potencia')"><span class="nd"></span>Potencia</button>
       <button class="ni" onclick="showSec('remuneracion')"><span class="nd"></span>Remuneración</button>
       <button class="ni" onclick="showSec('ctrl-rem')"><span class="nd"></span>Control de Remuneraciones</button>
+      <button class="ni" onclick="showSec('estoperativo')"><span class="nd"></span>Estado Operativo</button>
       <button class="ni" onclick="showSec('heatmap')"><span class="nd"></span>Perfil horario</button>
     </div>
     <div class="nav-group">
@@ -301,6 +302,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
     </div>
   </div>
 
+  <!-- ESTADO OPERATIVO -->
+  <div class="sec" id="sec-estoperativo">
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-title" style="margin-bottom:6px">Estado Operativo</div>
+      <div class="card-sub" style="margin-bottom:14px">Horas en cada estado durante el mes seleccionado</div>
+      <div id="estop-content"><div style="color:var(--muted);font-size:13px">Cargando...</div></div>
+    </div>
+  </div>
+
   <!-- POTENCIA -->
   <div class="sec" id="sec-potencia">
     <div class="kr" id="kpi-pot"></div>
@@ -410,6 +420,7 @@ const DAYS_IN = {'01':31,'02':28,'03':31,'04':30,'05':31,'06':30,
 
 const SHEETS_NEEDED = [
   'AVALTG23-ENERGIA','AVALTG22-ENERGIA','AVALTV11-ENERGIA','AVALTV12-ENERGIA',
+  'AVALTG23-EST_REMUN','AVALTG22-EST_REMUN','AVALTV11-EST_REMUN','AVALTV12-EST_REMUN',
   'AVALTG23-CVPCOMBREM-GX','AVALTG22-CVPCOMBREM-GX','AVALTV11-CVPCOMBREM-GX','AVALTV12-CVPCOMBREM-GX',
   'AVALTG23-CVPCOMBDESC-GX','AVALTG22-CVPCOMBDESC-GX','AVALTV11-CVPCOMBDESC-GX','AVALTV12-CVPCOMBDESC-GX',
   'AVALTG22-CVPTRANSPREMPROV-GX','AVALTG23-CVPTRANSPREMPROV-GX',
@@ -829,6 +840,7 @@ const MKEYS=['TG23','TG22','TV11','TV12'];
 const EKEYS={TG23:'AVALTG23-ENERGIA',TG22:'AVALTG22-ENERGIA',TV11:'AVALTV11-ENERGIA',TV12:'AVALTV12-ENERGIA'};
 const COMBKEYS={TG23:'AVALTG23-CVPCOMBREM-GX',TG22:'AVALTG22-CVPCOMBREM-GX',TV11:'AVALTV11-CVPCOMBREM-GX',TV12:'AVALTV12-CVPCOMBREM-GX'};
 const DESCKEYS={TG23:'AVALTG23-CVPCOMBDESC-GX',TG22:'AVALTG22-CVPCOMBDESC-GX',TV11:'AVALTV11-CVPCOMBDESC-GX',TV12:'AVALTV12-CVPCOMBDESC-GX'};
+const ESTKEYS={TG23:'AVALTG23-EST_REMUN',TG22:'AVALTG22-EST_REMUN',TV11:'AVALTV11-EST_REMUN',TV12:'AVALTV12-EST_REMUN'};
 const TRANSPKEYS={TG22:'AVALTG22-CVPTRANSPREMPROV-GX',TG23:'AVALTG23-CVPTRANSPREMPROV-GX'};
 const OYMKEYS={TG22:'AVALTG22-CVPOYMREM-GX',TG23:'AVALTG23-CVPOYMREM-GX'};
 const FPKEYS={TG23:'AVALTG23-FACTOR_PERDIDAS',TG22:'AVALTG22-FACTOR_PERDIDAS',TV11:'AVALTV11-FACTOR_PERDIDAS',TV12:'AVALTV12-FACTOR_PERDIDAS'};
@@ -1085,6 +1097,7 @@ const SMETA={
   potencia:{title:'Potencia disponible',sub:'MW por máquina · PPAD en USD/MW'},
   remuneracion:{title:'Remuneración',sub:'Por máquina y total'},
   'ctrl-rem':{title:'Control de Remuneraciones',sub:'Análisis de desvíos por quincena'},
+  'estoperativo':{title:'Estado Operativo',sub:'Horas por estado — mes seleccionado'},
   heatmap:{title:'Perfil horario',sub:'Distribución hora por día'},
   config:{title:'Configuración',sub:'Parámetros del modelo'},
 };
@@ -1101,7 +1114,7 @@ const built=new Set();
 function buildSection(id){
   if(built.has(id))return;built.add(id);
   ({resumen:buildResumen,resumenUSD:buildResumenUSD,energia:buildEnergia,cmo:buildCmo,
-    combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,
+    combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,estoperativo:buildEstOperativo,
     costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,
     heatmap:buildHeatmap,config:buildConfig})[id]?.();
 }
@@ -1825,6 +1838,115 @@ function buildCtrlRem(){
   }
 
   document.getElementById('ctrl-rem-content').innerHTML=out;
+}
+
+// ── ESTADO OPERATIVO ─────────────────────────────────────────────────────────
+const EST_LABELS={
+  'lib': {label:'Sin generación',   color:'var(--muted)'},
+  'COP': {label:'Costo Operativo',  color:'var(--warn)'},
+  'i-i': {label:'Indisponible',     color:'var(--danger)'},
+  'Arr': {label:'Arranque',         color:'var(--purple)'},
+  '===': {label:'Operación normal', color:'var(--success)'},
+};
+const EST_ORDER=['===','lib','COP','Arr','i-i'];
+
+function buildEstOperativo(){
+  const cont=document.getElementById('estop-content');
+
+  // Count hours per state per machine
+  const machineData={};
+  let totalHours=0;
+
+  MKEYS.forEach(m=>{
+    const rows=getRows(ESTKEYS[m]);
+    const counts={};
+    EST_ORDER.forEach(s=>counts[s]=0);
+    counts['otro']=0;
+    let total=0;
+
+    rows.forEach(r=>{
+      const hrs=r.h||Array(24).fill(r.avg||'lib');
+      hrs.forEach(v=>{
+        const s=String(v||'').trim();
+        if(counts[s]!==undefined) counts[s]++;
+        else counts['otro']++;
+        total++;
+      });
+    });
+
+    machineData[m]={counts,total};
+    if(!totalHours) totalHours=total;
+  });
+
+  const fmt=n=>Math.round(n).toLocaleString('es-AR');
+  const pct=(n,t)=>t?Math.round(n/t*100)+'%':'—';
+
+  // ── Resumen general (sum across all machines) ──
+  const sumCounts={};
+  EST_ORDER.forEach(s=>sumCounts[s]=0);
+  sumCounts['otro']=0;
+  let sumTotal=0;
+  MKEYS.forEach(m=>{
+    const {counts,total}=machineData[m];
+    Object.keys(counts).forEach(s=>{sumCounts[s]=(sumCounts[s]||0)+counts[s];});
+    sumTotal+=total;
+  });
+
+  let summaryHtml=`
+  <div style="margin-bottom:20px">
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Resumen — todas las máquinas (${fmt(sumTotal)} horas-máquina)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+      ${EST_ORDER.map(s=>{
+        const info=EST_LABELS[s]||{label:s,color:'var(--muted)'};
+        const n=sumCounts[s]||0;
+        return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:140px">
+          <div style="font-size:10px;color:${info.color};font-weight:600;text-transform:uppercase;letter-spacing:.06em">${info.label}</div>
+          <div style="font-size:22px;font-weight:700;color:var(--text);font-family:var(--mono)">${fmt(n)}</div>
+          <div style="font-size:11px;color:var(--muted)">${pct(n,sumTotal)} del total</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+
+  // ── Per-machine detail ──
+  let detailHtml=MKEYS.map(m=>{
+    const {counts,total}=machineData[m];
+    const rows=EST_ORDER.map(s=>{
+      const info=EST_LABELS[s]||{label:s,color:'var(--muted)'};
+      const n=counts[s]||0;
+      return `<tr>
+        <td style="padding:6px 12px;font-size:12px;color:${info.color};font-weight:500">${info.label}</td>
+        <td style="padding:6px 12px;font-size:12px;font-family:var(--mono);text-align:right;color:var(--text)">${fmt(n)}</td>
+        <td style="padding:6px 12px;font-size:12px;text-align:right;color:var(--muted)">${pct(n,total)}</td>
+      </tr>`;
+    }).join('');
+
+    const normal=counts['===']||0;
+    const indisp=counts['i-i']||0;
+    const dispPct=total?Math.round((total-indisp)/total*100):0;
+
+    return `<div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:12px">
+        ${m}
+        <span style="font-size:11px;font-weight:400;color:var(--muted)">${fmt(total)} horas totales</span>
+        <span style="font-size:11px;font-weight:600;color:${dispPct>=90?'var(--success)':'var(--warn)'}">Disp. ${dispPct}%</span>
+      </div>
+      <table style="border-collapse:collapse;background:var(--surface2);border-radius:6px;overflow:hidden;min-width:280px">
+        <thead><tr>
+          <th style="padding:6px 12px;font-size:10px;color:var(--muted);text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase">Estado</th>
+          <th style="padding:6px 12px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.06em;text-transform:uppercase">Horas</th>
+          <th style="padding:6px 12px;font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.06em;text-transform:uppercase">%</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  cont.innerHTML=`
+    ${summaryHtml}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">
+      ${detailHtml}
+    </div>`;
 }
 
 // ── INIT ────────────────────────────────────────────────────────────────────
