@@ -464,6 +464,17 @@ function parseSheet(wb, name) {
     return isNaN(n) ? null : n;
   }
 
+  // Extract string value from a cell (for text-based sheets like EST_REMUN)
+  function cellStr(v) {
+    if (v == null) return null;
+    if (typeof v === 'object' && !(v instanceof Date)) v = v.v;
+    if (v == null) return null;
+    return String(v).trim() || null;
+  }
+
+  // Text mode: EST_REMUN sheets store state strings per hour
+  const isTextSheet = name.includes('EST_REMUN');
+
   // Extract date string using local components (timezone-safe)
   function cellDate(v) {
     if (v == null) return null;
@@ -486,16 +497,23 @@ function parseSheet(wb, name) {
     // Read 24 hourly values (cols 2–25)
     const h = [];
     let hSum = 0, hCount = 0;
-    for (let hi = 0; hi < 24; hi++) {
-      const v = cellNum(row[2 + hi]);
-      h.push(v);
-      if (v != null) { hSum += v; hCount++; }
+    if (isTextSheet) {
+      // Text sheet: store state strings directly
+      for (let hi = 0; hi < 24; hi++) {
+        const v = cellStr(row[2 + hi]);
+        h.push(v || 'lib');
+      }
+    } else {
+      for (let hi = 0; hi < 24; hi++) {
+        const v = cellNum(row[2 + hi]);
+        h.push(v);
+        if (v != null) { hSum += v; hCount++; }
+      }
     }
 
     // avg = AVERAGE(non-null hours) — matches Excel =AVERAGE(C:Z) which ignores blanks
-    // This works for both ENERGIA (all 24 populated) and CVP (sparse hours, same price)
     const avg = hCount > 0 ? hSum / hCount : 0;
-    const hasH = hCount > 0;
+    const hasH = isTextSheet ? true : hCount > 0;
 
     const r = {fecha, avg: Math.round(avg * 1e6) / 1e6};
     if (hasH) r.h = h;
@@ -1865,9 +1883,9 @@ function buildEstOperativo(){
     let total=0;
 
     rows.forEach(r=>{
-      const hrs=r.h||Array(24).fill(r.avg||'lib');
+      const hrs=r.h||Array(24).fill('lib');
       hrs.forEach(v=>{
-        const s=String(v||'').trim();
+        const s=String(v||'lib').trim();
         if(counts[s]!==undefined) counts[s]++;
         else counts['otro']++;
         total++;
