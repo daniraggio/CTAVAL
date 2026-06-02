@@ -137,6 +137,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <button class="ni" onclick="showSec('remuneracion')"><span class="nd"></span>Remuneración</button>
       <button class="ni" onclick="showSec('ctrl-rem')"><span class="nd"></span>Control de Remuneraciones</button>
       <button class="ni" onclick="showSec('estoperativo')"><span class="nd"></span>Estado Operativo</button>
+      <button class="ni" onclick="showSec('rentamarginal')"><span class="nd"></span>Renta Marginal</button>
       <button class="ni" onclick="showSec('heatmap')"><span class="nd"></span>Perfil horario</button>
     </div>
     <div class="nav-group">
@@ -308,6 +309,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="card-title" style="margin-bottom:6px">Estado Operativo</div>
       <div class="card-sub" style="margin-bottom:14px">Horas en cada estado durante el mes seleccionado</div>
       <div id="estop-content"><div style="color:var(--muted);font-size:13px">Cargando...</div></div>
+    </div>
+  </div>
+
+  <!-- RENTA MARGINAL -->
+  <div class="sec" id="sec-rentamarginal">
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-title" style="margin-bottom:4px">Renta Marginal</div>
+      <div class="card-sub" style="margin-bottom:14px">MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E — por hora y máquina</div>
+      <div id="rentamarginal-content"><div style="color:var(--muted);font-size:13px">Cargando...</div></div>
     </div>
   </div>
 
@@ -1133,6 +1143,7 @@ const SMETA={
   remuneracion:{title:'Remuneración',sub:'Por máquina y total'},
   'ctrl-rem':{title:'Control de Remuneraciones',sub:'Análisis de desvíos por quincena'},
   'estoperativo':{title:'Estado Operativo',sub:'Horas por estado — mes seleccionado'},
+  'rentamarginal':{title:'Renta Marginal',sub:'Análisis por hora y máquina'},
   heatmap:{title:'Perfil horario',sub:'Distribución hora por día'},
   config:{title:'Configuración',sub:'Parámetros del modelo'},
 };
@@ -1150,7 +1161,7 @@ function buildSection(id){
   if(built.has(id))return;built.add(id);
   ({resumen:buildResumen,resumenUSD:buildResumenUSD,energia:buildEnergia,cmo:buildCmo,
     combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,estoperativo:buildEstOperativo,
-    costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,
+    costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,rentamarginal:buildRentaMarginal,
     heatmap:buildHeatmap,config:buildConfig})[id]?.();
 }
 
@@ -1908,6 +1919,104 @@ function buildCtrlRem(){
   }
 
   document.getElementById('ctrl-rem-content').innerHTML=out;
+}
+
+// ── RENTA MARGINAL ───────────────────────────────────────────────────────────
+function buildRentaMarginal(){
+  const tc=getTC();
+  const fmt=v=>Math.round(v).toLocaleString('es-AR');
+  const fmtUSD=v=>Math.round(v).toLocaleString('es-AR');
+
+  // Build daily data per machine: renta marginal total $ and $/MWh
+  const dates=allDates(Object.values(EKEYS));
+
+  // Summary KPIs
+  let totalRenta=0, totalE=0;
+  const byMachine={};
+  MKEYS.forEach(m=>{byMachine[m]={renta:0,e:0};});
+
+  dates.forEach(fecha=>{
+    for(let h=0;h<24;h++){
+      MKEYS.forEach(m=>{
+        const r=calcRemHour(m,fecha,h);if(!r)return;
+        const renta=Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC)*r.e;
+        totalRenta+=renta;
+        totalE+=r.e;
+        byMachine[m].renta+=renta;
+        byMachine[m].e+=r.e;
+      });
+    }
+  });
+
+  const avgPorMWh=totalE?totalRenta/totalE:0;
+
+  // KPI cards
+  let kpiHtml=`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 18px;min-width:160px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Total Renta Marginal</div>
+      <div style="font-size:20px;font-weight:700;color:var(--success);font-family:var(--mono)">$ ${fmt(totalRenta)}</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 18px;min-width:160px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Total en USD</div>
+      <div style="font-size:20px;font-weight:700;color:var(--teal);font-family:var(--mono)">USD ${fmtUSD(totalRenta/tc)}</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 18px;min-width:160px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Renta Marginal $/MWh</div>
+      <div style="font-size:20px;font-weight:700;color:var(--accent);font-family:var(--mono)">$ ${fmt(avgPorMWh)}</div>
+    </div>
+    ${MKEYS.map((m,i)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 18px;min-width:140px">
+      <div style="font-size:10px;color:${CL[i]};font-weight:600;text-transform:uppercase;letter-spacing:.06em">${m}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text);font-family:var(--mono)">$ ${fmt(byMachine[m].renta)}</div>
+      <div style="font-size:11px;color:var(--muted)">${byMachine[m].e?fmt(byMachine[m].renta/byMachine[m].e)+' $/MWh':'—'}</div>
+    </div>`).join('')}
+  </div>`;
+
+  // Daily table - $ and USD
+  const dailyData=dates.map(fecha=>{
+    let rentaD=0,eD=0;
+    const byM={};
+    MKEYS.forEach(m=>{
+      let rm=0,em=0;
+      for(let h=0;h<24;h++){
+        const r=calcRemHour(m,fecha,h);if(!r)continue;
+        rm+=Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC)*r.e;
+        em+=r.e;
+      }
+      byM[m]={renta:rm,e:em};
+      rentaD+=rm; eD+=em;
+    });
+    return{fecha,rentaD,eD,byM,rentaPerMWh:eD?rentaD/eD:0};
+  }).filter(x=>x.eD>0);
+
+  let tableHtml=`<div style="overflow-x:auto;margin-top:8px">
+    <table class="tbl">
+      <thead><tr>
+        <th>Fecha</th>
+        ${MKEYS.map(m=>`<th class="num">${m} ($)</th>`).join('')}
+        <th class="num">Total ($)</th>
+        <th class="num">Total (USD)</th>
+        <th class="num">$/MWh</th>
+      </tr></thead>
+      <tbody>
+        ${dailyData.map(d=>`<tr>
+          <td class="lbl">${fmtDate(d.fecha)}</td>
+          ${MKEYS.map(m=>`<td class="num">${fmt(d.byM[m].renta)}</td>`).join('')}
+          <td class="num" style="font-weight:600">${fmt(d.rentaD)}</td>
+          <td class="num" style="color:var(--teal)">${fmtUSD(d.rentaD/tc)}</td>
+          <td class="num" style="color:var(--accent)">${fmt(d.rentaPerMWh)}</td>
+        </tr>`).join('')}
+        <tr class="hi" style="font-weight:700">
+          <td class="lbl">TOTAL</td>
+          ${MKEYS.map(m=>`<td class="num">${fmt(byMachine[m].renta)}</td>`).join('')}
+          <td class="num">${fmt(totalRenta)}</td>
+          <td class="num" style="color:var(--teal)">${fmtUSD(totalRenta/tc)}</td>
+          <td class="num" style="color:var(--accent)">${fmt(avgPorMWh)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  document.getElementById('rentamarginal-content').innerHTML=kpiHtml+tableHtml;
 }
 
 // ── ESTADO OPERATIVO ─────────────────────────────────────────────────────────
