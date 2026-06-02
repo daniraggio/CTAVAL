@@ -44,4 +44,5 @@ jobs:
       - name: Enviar resumen por mail
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: python scripts/send_resumen.py
