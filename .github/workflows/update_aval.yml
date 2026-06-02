@@ -2,7 +2,7 @@ name: Actualizar Planillas AVAL
 
 on:
   schedule:
-    - cron: '0 11 * * *'
+    - cron: '0 11 * * *'   # 8 AM Argentina (UTC-3)
   workflow_dispatch:
 
 jobs:
@@ -30,15 +30,14 @@ jobs:
         run: |
           echo "=== Archivos en data/ ==="
           ls -lh data/
-          echo "=== Header del XLS ==="
-          xxd data/AVAL_*.xls | head -2 || hexdump -C data/AVAL_*.xls | head -2
 
       - name: Commit y push
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Actions Bot"
-          git status
           git add -f data/AVAL_*.xls
-          git status
           git diff --staged --quiet || git commit -m "🤖 Auto-update planillas AVAL $(date +'%Y-%m-%d')"
           git push
+
+      - name: Enviar resumen por mail
+        run: python scripts/send_resumen.py
