@@ -653,6 +653,12 @@ function ensureCombPropDefaults(mk){
   const def=MONTH_COMBPROP_DEFAULTS?.[mk]||{};
   if(mc.Q1combProp===undefined)mc.Q1combProp=def.Q1combProp??false;
   if(mc.Q2combProp===undefined)mc.Q2combProp=def.Q2combProp??false;
+  // Apply KP default based on month number (last 2 chars of mk e.g. '2026_04' -> '04')
+  if(mc.KP===undefined||mc.KP===0.9){
+    const mm=mk.slice(-2);
+    const kpDef=MONTH_KP_DEFAULTS?.[mm];
+    if(kpDef)mc.KP=kpDef;
+  }
 }
 let MONTH_META = {};    // {key: {label, badge}}
 
@@ -668,6 +674,12 @@ const MONTH_TC_DEFAULTS = {
 const MONTH_COMBPROP_DEFAULTS = {
   '2026_04': {Q1combProp:false, Q2combProp:false},
   '2026_05': {Q1combProp:true,  Q2combProp:true},
+};
+
+// Default KP por mes: verano (dic-feb, jun-ago) = 1.1, resto = 0.9
+const MONTH_KP_DEFAULTS = {
+  '01':1.1,'02':1.1,'03':0.9,'04':0.9,'05':0.9,
+  '06':1.1,'07':1.1,'08':1.1,'09':0.9,'10':0.9,'11':0.9,'12':1.1
 };
 
 function getTC(){return MONTH_CFG[MONTH]?.TC||1200;}
