@@ -22,6 +22,8 @@ jobs:
 
       - name: Instalar dependencias
         run: pip install requests
+
+      - name: Ejecutar script de descarga
         run: python scripts/descargar_aval.py
 
       - name: Verificar archivo descargado
