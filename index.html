@@ -1265,6 +1265,22 @@ function buildResumen(){
         unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diffAlt))}) — ${lblAlt}`,
         result:true, color:netAlt>=0?'var(--success)':'var(--danger)'};
     })(),
+    {sep:true,label:'Análisis'},
+    (()=>{
+      // Renta Marginal = Σ MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E
+      let rentaMarginal=0;
+      MKEYS.forEach(m=>{
+        allDates([EKEYS[m]]).forEach(fecha=>{
+          for(let h=0;h<24;h++){
+            const r=calcRemHour(m,fecha,h);if(!r)return;
+            rentaMarginal+=Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC)*r.e;
+          }
+        });
+      });
+      return {label:'Renta Marginal',
+        val:'$ '+fmtFull(rentaMarginal),
+        unit:'MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E — Σ todas las máquinas y horas'};
+    })(),
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
   document.getElementById('tbl-resumen-tc').innerHTML=
