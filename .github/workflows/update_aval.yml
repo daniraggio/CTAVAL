@@ -22,8 +22,6 @@ jobs:
 
       - name: Instalar dependencias
         run: pip install requests
-
-      - name: Ejecutar script de descarga
         run: python scripts/descargar_aval.py
 
       - name: Verificar archivo descargado
@@ -40,4 +38,6 @@ jobs:
           git push
 
       - name: Enviar resumen por mail
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: python scripts/send_resumen.py
