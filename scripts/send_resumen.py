@@ -8,14 +8,13 @@ Ruta en el repo: scripts/send_resumen.py
 """
 
 import json
-import urllib.request
-import urllib.error
+import os
+import requests
 from datetime import datetime
 from pathlib import Path
-import struct
 
-RESEND_API_KEY = "re_ZwDtQ1e7_7WXxMVzRhuGffmoi7LSNwxz8"
-FROM_EMAIL     = "onboarding@resend.dev"   # cambiar a draggio@aconcaguaenergia.com cuando el dominio esté verificado
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_ZwDtQ1e7_7WXxMVzRhuGffmoi7LSNwxz8")
+FROM_EMAIL     = "onboarding@resend.dev"
 TO_EMAILS      = ["draggio@aconcaguaenergia.com"]
 DASHBOARD_URL  = "https://daniraggio.github.io/CTAVAL/"
 DATA_DIR       = Path(__file__).resolve().parent.parent / "data"
@@ -87,26 +86,25 @@ def build_html_email(file_info):
 
 
 def send_email(html_body, subject):
-    payload = json.dumps({
-        "from": FROM_EMAIL,
-        "to": TO_EMAILS,
-        "subject": subject,
-        "html": html_body
-    }).encode()
-
-    req = urllib.request.Request(
+    resp = requests.post(
         "https://api.resend.com/emails",
-        data=payload,
-        method="POST",
         headers={
             "Authorization": f"Bearer {RESEND_API_KEY}",
             "Content-Type": "application/json"
-        }
+        },
+        json={
+            "from": FROM_EMAIL,
+            "to": TO_EMAILS,
+            "subject": subject,
+            "html": html_body
+        },
+        timeout=30
     )
-    with urllib.request.urlopen(req) as r:
-        resp = json.loads(r.read())
-        print(f"  ✅ Mail enviado — ID: {resp.get('id')}")
-        return resp
+    if not resp.ok:
+        raise Exception(f"Error {resp.status_code}: {resp.text}")
+    data = resp.json()
+    print(f"  ✅ Mail enviado — ID: {data.get('id')}")
+    return data
 
 
 if __name__ == "__main__":
