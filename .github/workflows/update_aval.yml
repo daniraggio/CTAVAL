@@ -21,7 +21,7 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar dependencias
-        run: pip install requests
+        run: pip install requests xlrd
 
       - name: Ejecutar script de descarga
         run: python scripts/descargar_aval.py
