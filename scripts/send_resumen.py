@@ -15,7 +15,7 @@ from pathlib import Path
 
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "re_ZwDtQ1e7_7WXxMVzRhuGffmoi7LSNwxz8")
 FROM_EMAIL     = "onboarding@resend.dev"
-TO_EMAILS      = ["draggio@aconcaguaenergia.com"]
+TO_EMAILS      = ["danielraggio@gmail.com"]  # prueba — cambiar cuando el dominio esté verificado
 DASHBOARD_URL  = "https://daniraggio.github.io/CTAVAL/"
 DATA_DIR       = Path(__file__).resolve().parent.parent / "data"
 
@@ -120,7 +120,6 @@ if __name__ == "__main__":
     print(f"  → Enviando a: {', '.join(TO_EMAILS)}")
     try:
         send_email(html, subject)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()
-        print(f"  ❌ Error {e.code}: {body}")
+    except Exception as e:
+        print(f"  ❌ Error: {e}")
         raise
