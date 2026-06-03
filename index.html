@@ -1280,15 +1280,15 @@ function buildResumen(){
     })(),
     {sep:true,label:'Análisis'},
     (()=>{
-      // Renta Marginal = Σ MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E
+      // Renta Marginal — mismo loop que buildRentaMarginal para garantizar consistencia
       let rentaMarginal=0;
-      MKEYS.forEach(m=>{
-        allDates([EKEYS[m]]).forEach(fecha=>{
-          for(let h=0;h<24;h++){
+      allDates(Object.values(EKEYS)).forEach(fecha=>{
+        for(let h=0;h<24;h++){
+          MKEYS.forEach(m=>{
             const r=calcRemHour(m,fecha,h);if(!r)return;
             rentaMarginal+=(r.isCOP?0:Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC))*r.e;
-          }
-        });
+          });
+        }
       });
       return {label:'Renta Marginal',
         val:'$ '+fmtFull(rentaMarginal),
