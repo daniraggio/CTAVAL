@@ -1254,7 +1254,7 @@ function buildResumen(){
     {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora'},
     {label:'Total Remuneraciones',val:'$ '+fmtFull(remGrand),         unit:'Energía + Potencia + Conf. + RPF',  b:true},
     {sep:true,label:'Costos'},
-    {label:'Costo Gas',         val:'$ '+fmtFull(costoGas.TOTAL),     unit:'Σ(CVP_Comb + CVP_Transp) × E — por hora y máquina',  },
+    {label:'Costo Gas',         val:'$ '+fmtFull(costoGas.TOTAL),     unit:'Σ(CVP_CombRem + CVP_TranspProvRem) × E — por hora · 4 máquinas (TG23, TG22, TV11, TV12)'},
     {label:'Canon del Agua',    val:'$ '+fmtFull(canonAgua),          unit:fmtFull(eMWh.TOTAL)+' MWh × $'+CFG.CANON_AGUA, },
     {label:'Transporte',        val:'$ '+fmtFull(transporte),         unit:'valor fijo configurado',  },
     {label:'ENRE',              val:'$ '+fmtFull(enre),                unit:'valor fijo configurado (default 1.658.007 ÷ 3)'},
