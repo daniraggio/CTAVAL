@@ -1079,7 +1079,8 @@ function calcRemHour(m,fecha,h){
   const fp=fpRow?.h?fpRow.h[h]??fpRow.avg:fpRow?.avg??1;
   const cmoFP=(cmo||0)*(fp||1);
   const tc_rmin=getTC();const cvpUSD=tc_rmin>0?cvpTotal/tc_rmin:0;
-  const RMIN=cvpUSD<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
+  const RMIN_USD=cvpUSD<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
+  const RMIN=RMIN_USD*tc_rmin;  // convert RMIN to ARS for comparison with diff×FRA
   const FRC=getFRC(fecha);
   const diff=Math.max(0,cmoFP-cvpTotal);
   // Check operational state: if COP, only CVP is remunerated (no renta margin)
@@ -1087,7 +1088,7 @@ function calcRemHour(m,fecha,h){
   const estH=estRow?.h?estRow.h[h]:'===';
   const isCOP=estH==='COP';
   const rem=isCOP?cvpTotal:(cvpTotal+Math.max(RMIN,diff*CFG.FRA*FRC));
-  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,FRC,diff,rem,isCOP};
+  return{e,comb:combV||0,transp:transpV,oym:oymV,cvpTotal,cmo:cmo||0,fp:fp||1,cmoFP,RMIN,RMIN_USD,FRC,diff,rem,isCOP};
 }
 function calcRemDaily(m){
   return allDates([EKEYS[m]]).map(fecha=>{
