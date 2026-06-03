@@ -1078,7 +1078,8 @@ function calcRemHour(m,fecha,h){
   const fpRow=getRows(FPKEYS[m]).find(x=>x.fecha===fecha);
   const fp=fpRow?.h?fpRow.h[h]??fpRow.avg:fpRow?.avg??1;
   const cmoFP=(cmo||0)*(fp||1);
-  const RMIN=cvpTotal<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
+  const tc_rmin=getTC();const cvpUSD=tc_rmin>0?cvpTotal/tc_rmin:0;
+  const RMIN=cvpUSD<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
   const FRC=getFRC(fecha);
   const diff=Math.max(0,cmoFP-cvpTotal);
   // Check operational state: if COP, only CVP is remunerated (no renta margin)
@@ -1284,7 +1285,7 @@ function buildResumen(){
         allDates([EKEYS[m]]).forEach(fecha=>{
           for(let h=0;h<24;h++){
             const r=calcRemHour(m,fecha,h);if(!r)return;
-            rentaMarginal+=Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC)*r.e;
+            rentaMarginal+=(r.isCOP?0:Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC))*r.e;
           }
         });
       });
@@ -1940,7 +1941,7 @@ function buildRentaMarginal(){
       let renta=0,e=0;
       MKEYS.forEach(m=>{
         const r=calcRemHour(m,fecha,h);if(!r)return;
-        renta+=Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC)*r.e;
+        renta+=(r.isCOP?0:Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC))*r.e;
         e+=r.e;
       });
       matrix[fecha][h]={renta,e};
