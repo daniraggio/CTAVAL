@@ -393,8 +393,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <!-- filled dynamically per month -->
     </div>
     <div style="padding:4px 0 20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-      <button id="cfgApplyBtn" onclick="saveConfig()" style="background:rgba(79,142,247,.2);color:var(--accent);border:1px solid rgba(79,142,247,.4);border-radius:8px;padding:10px 28px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">Aplicar cambios</button>
-      <button id="exportCfgBtn" onclick="exportConfig()" style="background:rgba(45,212,191,.1);color:var(--teal);border:1px solid rgba(45,212,191,.3);border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">⬇ Exportar config.json</button>
+      <button id="cfgApplyBtn" onclick="saveConfigAndPush()" style="background:rgba(52,211,153,.15);color:var(--success);border:1px solid rgba(52,211,153,.4);border-radius:8px;padding:10px 28px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">☁ Aplicar y guardar en GitHub</button>
       <span style="font-size:11px;color:var(--muted);max-width:320px;line-height:1.5">Descargá <code style="color:var(--teal)">config.json</code> y subilo a <code style="color:var(--teal)">/data/</code> en el repo para que los ajustes persistan al actualizar el dashboard.</span>
     </div>
     <div class="cfg-grid">
@@ -821,6 +820,50 @@ function saveGHTokenFromInput(){
   saveGHToken(v);
   document.getElementById('gh-token-panel').style.display='none';
   publishToGitHub();
+}
+
+async function saveConfigAndPush(){
+  saveConfig();
+  await saveConfigToGitHub();
+}
+
+async function saveConfigToGitHub(){
+  const token=getGHToken();
+  if(!token){showGHPanel();return;}
+  const btn=document.getElementById('cfgSaveGHBtn');
+  btn.textContent='⏳ Guardando...';btn.disabled=true;
+
+  try{
+    const REPO='daniraggio/CTAVAL';
+    const PATH='data/config.json';
+    const hdrs={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'};
+
+    // Build config object
+    const cfg={MONTH_CFG,CFG};
+    const content=JSON.stringify(cfg,null,2);
+
+    // Get current SHA
+    let sha=null;
+    try{
+      const metaRes=await fetch(`https://api.github.com/repos/${REPO}/contents/${PATH}`,{headers:hdrs});
+      if(metaRes.ok) sha=(await metaRes.json()).sha;
+    }catch(e){}
+
+    const body={message:'Config update '+new Date().toISOString().slice(0,10),content:utf8ToB64(content),branch:'main'};
+    if(sha)body.sha=sha;
+
+    const putRes=await fetch(`https://api.github.com/repos/${REPO}/contents/${PATH}`,{
+      method:'PUT',headers:hdrs,body:JSON.stringify(body)
+    });
+    if(!putRes.ok){const e=await putRes.json();throw new Error(e.message);}
+
+    btn.textContent='✅ Config guardado';btn.style.background='rgba(52,211,153,.25)';
+    setTimeout(()=>{btn.textContent='☁ Guardar config en GitHub';btn.style.background='';btn.disabled=false;},3000);
+  }catch(e){
+    console.error('Config save error:',e);
+    btn.textContent='❌ '+e.message.slice(0,40);btn.style.color='var(--danger)';
+    setTimeout(()=>{btn.textContent='☁ Guardar config en GitHub';btn.style.background='';btn.style.color='var(--success)';btn.disabled=false;},5000);
+  }
 }
 
 function showCfgSaved(){
