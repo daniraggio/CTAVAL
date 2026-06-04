@@ -1,19 +1,40 @@
 {
-  "_version": 1,
-  "CFG": {
-    "FRA": 0.15,
-    "RMIN_LO": 2,
-    "RMIN_HI": 7,
-    "RMIN_THR": 60,
-    "CONF": 2000,
-    "CANON_AGUA": 840,
-    "TRANSPORTE": 2,
-    "ENRE": 552669
-  },
   "MONTH_CFG": {
-    "2026_02": {
-      "TC": 1350,
+    "2026_01": {
+      "TC": 1299.9999,
       "KP": 0.9,
+      "Q1combProp": false,
+      "Q2combProp": false,
+      "Q1d": "",
+      "Q1h": "",
+      "Q2d": "",
+      "Q2h": "",
+      "Q1Comb": {
+        "TG23": 0,
+        "TG22": 0,
+        "TV11": 0,
+        "TV12": 0
+      },
+      "Q1Oym": {
+        "TG23": 0,
+        "TG22": 0
+      },
+      "Q2Comb": {
+        "TG23": 0,
+        "TG22": 0,
+        "TV11": 0,
+        "TV12": 0
+      },
+      "Q2Oym": {
+        "TG23": 0,
+        "TG22": 0
+      }
+    },
+    "2026_02": {
+      "TC": 1408.966,
+      "KP": 0.9,
+      "Q1combProp": false,
+      "Q2combProp": false,
       "Q1d": "",
       "Q1h": "",
       "Q2d": "",
@@ -44,8 +65,10 @@
       }
     },
     "2026_03": {
-      "TC": 1450,
+      "TC": 1382.757,
       "KP": 0.9,
+      "Q1combProp": false,
+      "Q2combProp": false,
       "Q1d": "",
       "Q1h": "",
       "Q2d": "",
@@ -78,6 +101,8 @@
     "2026_04": {
       "TC": 1381.0954,
       "KP": 0.9,
+      "Q1combProp": true,
+      "Q2combProp": true,
       "Q1d": "2026-03-30",
       "Q1h": "2026-04-12",
       "Q2d": "2026-04-13",
@@ -108,8 +133,10 @@
       }
     },
     "2026_05": {
-      "TC": 1400,
+      "TC": 1408,
       "KP": 0.9,
+      "Q1combProp": true,
+      "Q2combProp": true,
       "Q1d": "2026-05-04",
       "Q1h": "2026-05-17",
       "Q2d": "2026-05-18",
@@ -138,7 +165,46 @@
         "TV11": 0,
         "TV12": 0
       }
+    },
+    "2026_06": {
+      "TC": 1270,
+      "KP": 1.1,
+      "Q1combProp": false,
+      "Q2combProp": false,
+      "Q1d": "",
+      "Q1h": "",
+      "Q2d": "",
+      "Q2h": "",
+      "Q1Comb": {
+        "TG23": 0,
+        "TG22": 0,
+        "TV11": 0,
+        "TV12": 0
+      },
+      "Q1Oym": {
+        "TG23": 0,
+        "TG22": 0
+      },
+      "Q2Comb": {
+        "TG23": 0,
+        "TG22": 0,
+        "TV11": 0,
+        "TV12": 0
+      },
+      "Q2Oym": {
+        "TG23": 0,
+        "TG22": 0
+      }
     }
   },
-  "LAST_MONTH": "2026_05"
+  "CFG": {
+    "FRA": 0.15,
+    "RMIN_LO": 2,
+    "RMIN_HI": 7,
+    "RMIN_THR": 60,
+    "CONF": 2000,
+    "CANON_AGUA": 840,
+    "TRANSPORTE": 2,
+    "ENRE": 552669
+  }
 }
