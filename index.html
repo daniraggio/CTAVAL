@@ -1735,6 +1735,7 @@ function buildConfig(){
   document.getElementById('cfgENRE').value=CFG.ENRE;
   // Build per-month TC/KP cards
   const grid=document.getElementById('cfg-per-month-grid');
+  grid.style.gridTemplateColumns='repeat(3,1fr)';
   if(grid){
     grid.innerHTML=Object.keys(MONTH_CFG).map(mk=>`
       <div class="cfg-card" style="min-width:320px">
@@ -2016,7 +2017,7 @@ function buildRentaMarginal(){
     </div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 18px;min-width:160px">
       <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Promedio USD/MWh</div>
-      <div style="font-size:20px;font-weight:700;color:var(--teal);font-family:var(--mono)">USD ${fmtN2(avgPorMWh/tc)}</div>
+      <div style="font-size:20px;font-weight:700;color:var(--teal);font-family:var(--mono)">USD ${(avgPorMWh/tc).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})}</div>
     </div>
   </div>`;
 
