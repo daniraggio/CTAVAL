@@ -489,7 +489,7 @@ function parseSheet(wb, name) {
   }
 
   // Text mode: EST_REMUN sheets store state strings per hour
-  const isTextSheet = name.includes('EST_REMUN');
+  const isTextSheet = name.includes('EST_REMUN') || name.includes('ESTREMUN');
 
   // Extract date string using local components (timezone-safe)
   function cellDate(v) {
