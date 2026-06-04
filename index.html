@@ -169,9 +169,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 
   <!-- RESUMEN ARS -->
   <div class="sec active" id="sec-resumen">
-    <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio activo</div>
-      <div id="tbl-resumen-tc" style="display:inline-block"></div>
+    <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:center;gap:32px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio</div>
+        <div id="tbl-resumen-tc" style="display:inline-block"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Producción con gas propio</div>
+        <div id="tbl-resumen-ga" style="display:inline-block"></div>
+      </div>
     </div>
     <div class="card" style="margin-bottom:18px">
       <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — acumulado diario</div></div></div>
@@ -1280,22 +1286,7 @@ function buildResumen(){
   const kpiRows=[
     {sep:true,label:'Producción'},
     {label:'Energía generada',   val:fmtFull(eMWh.TOTAL), unit:'MWh — Σ TG23+TG22+TV11+TV12'},
-    {label:'Potencia del mes',   val:fmtFull(potMes),       unit:'MW — promedio horario Σ 4 máquinas'},
-    (()=>{
-      // Count GA hours per machine
-      const gaHours={};let gaTotal=0;
-      MKEYS.forEach(m=>{
-        let h=0;
-        getRows(ESTKEYS_GA[m]).forEach(r=>{
-          const hrs=r.h||[];
-          hrs.forEach(v=>{ if(v==='==='||v==='Arr') h++; });
-        });
-        gaHours[m]=h; gaTotal+=h;
-      });
-      if(gaTotal===0) return null;
-      const parts=MKEYS.filter(m=>gaHours[m]>0).map(m=>`${m}: ${gaHours[m]}h`).join(' | ');
-      return {label:'Horas Gas Propio (GA)',val:String(gaTotal)+' h',unit:parts,color:'var(--warn)'};
-    })(),
+    {label:'Potencia del mes',   val:fmtN(potMes,1),        unit:'MW — promedio horario Σ 4 máquinas'},
     {sep:true,label:'Remuneraciones'},
     {label:'Rem. Energía',      val:'$ '+fmtFull(remE.TOTAL),
       unit:'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E',
@@ -1361,6 +1352,18 @@ function buildResumen(){
   document.getElementById('tbl-resumen-tc').innerHTML=
     `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
     `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD</span>`;
+
+  // GA hours card
+  const gaH={};let gaTotal=0;
+  MKEYS.forEach(m=>{
+    let h=0;
+    getRows(ESTKEYS_GA[m]).forEach(r=>{(r.h||[]).forEach(v=>{if(v==='==='||v==='Arr')h++;});});
+    gaH[m]=h; gaTotal+=h;
+  });
+  const gaLabel=gaTotal>0
+    ? `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--warn)">${gaTotal} h</span><span style="font-size:11px;color:var(--muted);margin-left:8px">${MKEYS.filter(m=>gaH[m]>0).map(m=>m+': '+gaH[m]+'h').join(' | ')}</span>`
+    : `<span style="font-size:13px;color:var(--muted)">Sin gas propio</span>`;
+  document.getElementById('tbl-resumen-ga').innerHTML=gaLabel;
   _buildResumenCharts('cEnergiaRes',null,null);
 }
 
@@ -1409,21 +1412,6 @@ function _renderResumenUSD(){
     {sep:true,label:'Producción'},
     {label:'Energía generada',    val:fmtFull(eMWh.TOTAL),                   unit:'MWh'},
     {label:'Potencia del mes',    val:fmtN(potMes,2),                         unit:'MW'},
-    (()=>{
-      // Count GA hours per machine
-      const gaHours={};let gaTotal=0;
-      MKEYS.forEach(m=>{
-        let h=0;
-        getRows(ESTKEYS_GA[m]).forEach(r=>{
-          const hrs=r.h||[];
-          hrs.forEach(v=>{ if(v==='==='||v==='Arr') h++; });
-        });
-        gaHours[m]=h; gaTotal+=h;
-      });
-      if(gaTotal===0) return null;
-      const parts=MKEYS.filter(m=>gaHours[m]>0).map(m=>`${m}: ${gaHours[m]}h`).join(' | ');
-      return {label:'Horas Gas Propio (GA)',val:String(gaTotal)+' h',unit:parts,color:'var(--warn)'};
-    })(),
     {sep:true,label:'Remuneraciones'},
     {label:'Rem. Energía',        val:u+fmtFull(toU(remE.TOTAL)),             unit:'', },
     {label:'Rem. Potencia',       val:u+fmtFull(remP.TOTAL),                  unit:'($ '+fmtFull(remP.TOTAL*tc)+')', },
