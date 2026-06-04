@@ -75,7 +75,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 .tc-bar label{font-size:12px;color:var(--muted);white-space:nowrap;}
 .inp{background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:14px;font-weight:700;padding:6px 10px;width:130px;text-align:right;}
 .inp:focus{outline:none;border-color:var(--accent);}
-.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:20px;}
+.cfg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px;}
 .cfg-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:20px;}
 .cfg-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em;}
 .cfg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
@@ -1355,12 +1355,12 @@ function _buildResumenCharts(eChartId,_legId,cmoChartId,usdMode){
   const ds=MKEYS.map((m,i)=>({label:m,data:dates.map(d=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);return eMWh(r);}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
   const totData=dates.map(d=>{let s=0;MKEYS.forEach(m=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);if(r)s+=eMWh(r)||0;});return s;});
   ds.push({label:'TOTAL',data:totData,borderColor:'#fff',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:2,borderDash:[4,3],spanGaps:true});
-  mkChart(eChartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts,tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+Math.round(ctx.parsed.y).toLocaleString('es-AR')+' MWh'}}},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:12}},y:{grid:GR,ticks:{...TK,callback:v=>Math.round(v).toLocaleString('es-AR')}}}}});
+  mkChart(eChartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts,tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+Math.round(ctx.parsed.y).toLocaleString('es-AR')+' MWh'}}},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:12}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>Math.round(v).toLocaleString('es-AR')}}}}});
   const cmoR=getRows('PRECIOS-CMO');
   const cmoData=tc?cmoR.map(r=>r.avg/tc):cmoR.map(r=>r.avg);
   const cmoLabel=tc?'CMO USD/MWh':'CMO $/MWh';
   const cmoFmt=tc?v=>'USD '+fmtK(v):v=>'$'+fmtK(v);
-  if(cmoChartId)mkChart(cmoChartId,{type:'line',data:{labels:cmoR.map(r=>fmtDate(r.fecha)),datasets:[{label:cmoLabel,data:cmoData,borderColor:'#fbbf24',backgroundColor:'#fbbf2422',fill:true,tension:0.3,pointRadius:2,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:cmoFmt}}}}});
+  if(cmoChartId)mkChart(cmoChartId,{type:'line',data:{labels:cmoR.map(r=>fmtDate(r.fecha)),datasets:[{label:cmoLabel,data:cmoData,borderColor:'#fbbf24',backgroundColor:'#fbbf2422',fill:true,tension:0.3,pointRadius:2,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:cmoFmt}}}}});
 }
 
 // ── RESUMEN USD ────────────────────────────────────────────────────────────
@@ -1440,7 +1440,7 @@ function renderEChart(){
     ds=[{label:`Energía ${m} (MWh)`,data:rows.map(r=>r.avg),borderColor:CL[eActive],backgroundColor:CL[eActive]+'33',fill:true,tension:0.3,pointRadius:3,borderWidth:2}];
     lbls=rows.map(r=>fmtDate(r.fecha));document.getElementById('eChartTitle').textContent=`Energía ${m}`;
   }
-  mkChart('cEnergiaDetail',{type:'line',data:{labels:lbls,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:14}},y:{grid:GR,ticks:TK}}}});
+  mkChart('cEnergiaDetail',{type:'line',data:{labels:lbls,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:14}},y:{min:0,grid:GR,ticks:TK}}}});
 }
 
 // ── CMO ────────────────────────────────────────────────────────────────────
@@ -1453,22 +1453,24 @@ function buildCmo(){
     <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtK(last)}</div><div class="kpi-unit">$/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
     <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtK(mn)}</div><div class="kpi-unit">$/MWh</div></div>
     <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtK(mx)}</div><div class="kpi-unit">$/MWh</div></div>`;
-  mkChart('cCmoFull',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO $/MWh',data:avgs,borderColor:'#fbbf24',backgroundColor:'#fbbf2415',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+  mkChart('cCmoFull',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO $/MWh',data:avgs,borderColor:'#fbbf24',backgroundColor:'#fbbf2415',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
 }
 
 // ── GENERIC CVP ────────────────────────────────────────────────────────────
 function buildCvpSection(secId,keys,labels,chartId,titleId,tblDbgId,tabsId){
   let active=0;
   function render(a){
+    // Filter dates from first day of current month
+    const monthStart=allDates(Object.values(EKEYS))[0]||'';
     if(a===-1){
-      const dates=allDates(keys);
+      const dates=allDates(keys).filter(d=>d>=monthStart);
       const ds=keys.map((k,i)=>({label:labels[i],data:dates.map(d=>{const r=getRows(k).find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
-      mkChart(chartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+      mkChart(chartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
       document.getElementById(titleId).textContent='CVP — todos';
       if(tblDbgId)document.getElementById(tblDbgId).innerHTML='<tr><td style="color:var(--muted);padding:12px">Seleccioná una máquina para ver el detalle horario.</td></tr>';
     } else {
-      const k=keys[a];const rows=getRows(k);const col=CL[a];
-      mkChart(chartId,{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:`${labels[a]} $/MWh`,data:rows.map(r=>r.avg),borderColor:col,backgroundColor:col+'22',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+      const k=keys[a];const rows=getRows(k).filter(r=>r.fecha>=monthStart);const col=CL[a];
+      mkChart(chartId,{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:`${labels[a]} $/MWh`,data:rows.map(r=>r.avg),borderColor:col,backgroundColor:col+'22',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
       document.getElementById(titleId).textContent=`CVP — ${labels[a]}`;
       if(tblDbgId)buildDbgTable(tblDbgId,k);
     }
@@ -1528,7 +1530,7 @@ function buildPotencia(){
   // PPAD line on secondary axis
   const ppadRows=getRows('PRECIOS-PPAD');
   ds.push({label:'PPAD (USD/MW)',data:dates.map(d=>{const r=ppadRows.find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:'#fbbf24',backgroundColor:'transparent',fill:false,tension:0,pointRadius:3,borderWidth:1.5,borderDash:[2,2],yAxisID:'y2',spanGaps:true});
-  mkChart('cPotLine',{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:14}},y:{grid:GR,ticks:TK,title:{display:true,text:'MW',color:'#7a8099',font:{size:10}}},y2:{position:'right',grid:{display:false},ticks:{...TK,color:'#fbbf24'},title:{display:true,text:'USD/MW',color:'#fbbf24',font:{size:10}}}}}});
+  mkChart('cPotLine',{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:14}},y:{min:0,grid:GR,ticks:TK,title:{display:true,text:'MW',color:'#7a8099',font:{size:10}}},y2:{position:'right',grid:{display:false},ticks:{...TK,color:'#fbbf24'},title:{display:true,text:'USD/MW',color:'#fbbf24',font:{size:10}}}}}});
   // Table
   const potByDate=potTotalByDate();
   const ppadByDate=Object.fromEntries(ppadRows.map(r=>[r.fecha,r]));
@@ -1615,7 +1617,7 @@ function renderRemMachine(m){
   mkChart('cRemLine',{type:'line',data:{labels:daily.map(x=>fmtDate(x.fecha)),datasets:[
     {label:`REM ${m} ($/MWh)`,data:daily.map(x=>x.remAvg),borderColor:'#a78bfa',backgroundColor:'#a78bfa22',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
     {label:`CVP ${m} ($/MWh)`,data:daily.map(x=>x.cvpAvg),borderColor:'#f87171',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
   document.getElementById('tbl-rem').innerHTML=`<thead><tr><th>Fecha</th><th class="num">E (MWh)</th><th class="num">CVP_Comb</th><th class="num">CVP_Transp</th><th class="num">CVP_OyM</th><th class="num">CVP_Total</th><th class="num">REM avg</th><th class="num">REM total $</th></tr></thead><tbody>${
     daily.map(x=>`<tr><td class="lbl">${fmtDate(x.fecha)}</td><td class="num">${fmtN(x.E,1)}</td><td class="num">${fmtK(x.combAvg)}</td><td class="num">${fmtK(x.transpAvg)}</td><td class="num">${fmtK(x.oymAvg)}</td><td class="num">${fmtK(x.cvpAvg)}</td><td class="num" style="color:var(--purple)">${fmtK(x.remAvg)}</td><td class="num" style="color:var(--purple)">${fmtFull(x.remTotal||x.remAvg*x.E)}</td></tr>`).join('')}</tbody>`;
   buildRemDbgTable(m);
@@ -1631,7 +1633,7 @@ function renderRemTotal(){
   mkChart('cRemLine',{type:'line',data:{labels:combined.map(x=>fmtDate(x.fecha)),datasets:[
     {label:'REM prom. ponderado ($/MWh)',data:combined.map(x=>x.remAvg),borderColor:'#a78bfa',backgroundColor:'#a78bfa22',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
     {label:'CVP prom. ponderado ($/MWh)',data:combined.map(x=>x.cvpAvg),borderColor:'#f87171',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
   document.getElementById('tbl-rem').innerHTML=`<thead><tr><th>Fecha</th><th class="num">E total (MWh)</th><th class="num">CVP prom.</th><th class="num">REM prom.</th><th class="num">REM total $</th></tr></thead><tbody>${
     combined.map(x=>`<tr><td class="lbl">${fmtDate(x.fecha)}</td><td class="num">${fmtN(x.E,1)}</td><td class="num">${fmtK(x.cvpAvg)}</td><td class="num" style="color:var(--purple)">${fmtK(x.remAvg)}</td><td class="num" style="color:var(--purple)">${fmtFull(x.remTotal)}</td></tr>`).join('')}</tbody>`;
   document.getElementById('tbl-rem-dbg').innerHTML='<tr><td class="rl" style="color:var(--muted)">Seleccioná una máquina individual para ver el detalle horario.</td></tr>';
@@ -1682,7 +1684,7 @@ function buildCostos(){
   const daily=calcCostoGasDaily();
   mkChart('cCostosLine',{type:'line',data:{labels:daily.map(x=>fmtDate(x.fecha)),datasets:[
     {label:'Costo Gas diario ($)',data:daily.map(x=>x.val),borderColor:'#f87171',backgroundColor:'#f8717122',fill:true,tension:0.3,pointRadius:3,borderWidth:2},
-  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
 }
 
 // ── HEATMAP ────────────────────────────────────────────────────────────────
