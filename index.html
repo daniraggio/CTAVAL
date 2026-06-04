@@ -429,6 +429,7 @@ const DAYS_IN = {'01':31,'02':28,'03':31,'04':30,'05':31,'06':30,
 const SHEETS_NEEDED = [
   'AVALTG23-ENERGIA','AVALTG22-ENERGIA','AVALTV11-ENERGIA','AVALTV12-ENERGIA',
   'AVALTG23-EST_REMUN','AVALTG22-EST_REMUN','AVALTV11-EST_REMUN','AVALTV12-EST_REMUN',
+  'AVALTG23-ESTREMUN-GA','AVALTG22-ESTREMUN-GA','AVALTV11-ESTREMUN-GA','AVALTV12-ESTREMUN-GA',
   'AVALTG23-CVPCOMBREM-GX','AVALTG22-CVPCOMBREM-GX','AVALTV11-CVPCOMBREM-GX','AVALTV12-CVPCOMBREM-GX',
   'AVALTG23-CVPCOMBDESC-GX','AVALTG22-CVPCOMBDESC-GX','AVALTV11-CVPCOMBDESC-GX','AVALTV12-CVPCOMBDESC-GX',
   'AVALTG23-CVPCOMBDESP-GX','AVALTG22-CVPCOMBDESP-GX','AVALTV11-CVPCOMBDESP-GX','AVALTV12-CVPCOMBDESP-GX',
@@ -928,6 +929,7 @@ const COMBKEYS={TG23:'AVALTG23-CVPCOMBREM-GX',TG22:'AVALTG22-CVPCOMBREM-GX',TV11
 const DESCKEYS={TG23:'AVALTG23-CVPCOMBDESC-GX',TG22:'AVALTG22-CVPCOMBDESC-GX',TV11:'AVALTV11-CVPCOMBDESC-GX',TV12:'AVALTV12-CVPCOMBDESC-GX'};
 const DESPKEYS={TG23:'AVALTG23-CVPCOMBDESP-GX',TG22:'AVALTG22-CVPCOMBDESP-GX',TV11:'AVALTV11-CVPCOMBDESP-GX',TV12:'AVALTV12-CVPCOMBDESP-GX'};
 const ESTKEYS={TG23:'AVALTG23-EST_REMUN',TG22:'AVALTG22-EST_REMUN',TV11:'AVALTV11-EST_REMUN',TV12:'AVALTV12-EST_REMUN'};
+const ESTKEYS_GA={TG23:'AVALTG23-ESTREMUN-GA',TG22:'AVALTG22-ESTREMUN-GA',TV11:'AVALTV11-ESTREMUN-GA',TV12:'AVALTV12-ESTREMUN-GA'};
 const TRANSPKEYS={TG22:'AVALTG22-CVPTRANSPREMPROV-GX',TG23:'AVALTG23-CVPTRANSPREMPROV-GX',TV11:'AVALTV11-CVPTRANSPREMPROV-GX',TV12:'AVALTV12-CVPTRANSPREMPROV-GX'};
 const OYMKEYS={TG22:'AVALTG22-CVPOYMREM-GX',TG23:'AVALTG23-CVPOYMREM-GX'};
 const FPKEYS={TG23:'AVALTG23-FACTOR_PERDIDAS',TG22:'AVALTG22-FACTOR_PERDIDAS',TV11:'AVALTV11-FACTOR_PERDIDAS',TV12:'AVALTV12-FACTOR_PERDIDAS'};
@@ -1279,6 +1281,21 @@ function buildResumen(){
     {sep:true,label:'Producción'},
     {label:'Energía generada',   val:fmtFull(eMWh.TOTAL), unit:'MWh — Σ TG23+TG22+TV11+TV12'},
     {label:'Potencia del mes',   val:fmtFull(potMes),       unit:'MW — promedio horario Σ 4 máquinas'},
+    (()=>{
+      // Count GA hours per machine
+      const gaHours={};let gaTotal=0;
+      MKEYS.forEach(m=>{
+        let h=0;
+        getRows(ESTKEYS_GA[m]).forEach(r=>{
+          const hrs=r.h||[];
+          hrs.forEach(v=>{ if(v==='==='||v==='Arr') h++; });
+        });
+        gaHours[m]=h; gaTotal+=h;
+      });
+      if(gaTotal===0) return null;
+      const parts=MKEYS.filter(m=>gaHours[m]>0).map(m=>`${m}: ${gaHours[m]}h`).join(' | ');
+      return {label:'Horas Gas Propio (GA)',val:String(gaTotal)+' h',unit:parts,color:'var(--warn)'};
+    })(),
     {sep:true,label:'Remuneraciones'},
     {label:'Rem. Energía',      val:'$ '+fmtFull(remE.TOTAL),
       unit:'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E',
@@ -1392,6 +1409,21 @@ function _renderResumenUSD(){
     {sep:true,label:'Producción'},
     {label:'Energía generada',    val:fmtFull(eMWh.TOTAL),                   unit:'MWh'},
     {label:'Potencia del mes',    val:fmtN(potMes,2),                         unit:'MW'},
+    (()=>{
+      // Count GA hours per machine
+      const gaHours={};let gaTotal=0;
+      MKEYS.forEach(m=>{
+        let h=0;
+        getRows(ESTKEYS_GA[m]).forEach(r=>{
+          const hrs=r.h||[];
+          hrs.forEach(v=>{ if(v==='==='||v==='Arr') h++; });
+        });
+        gaHours[m]=h; gaTotal+=h;
+      });
+      if(gaTotal===0) return null;
+      const parts=MKEYS.filter(m=>gaHours[m]>0).map(m=>`${m}: ${gaHours[m]}h`).join(' | ');
+      return {label:'Horas Gas Propio (GA)',val:String(gaTotal)+' h',unit:parts,color:'var(--warn)'};
+    })(),
     {sep:true,label:'Remuneraciones'},
     {label:'Rem. Energía',        val:u+fmtFull(toU(remE.TOTAL)),             unit:'', },
     {label:'Rem. Potencia',       val:u+fmtFull(remP.TOTAL),                  unit:'($ '+fmtFull(remP.TOTAL*tc)+')', },
