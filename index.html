@@ -830,7 +830,7 @@ async function saveConfigAndPush(){
 async function saveConfigToGitHub(){
   const token=getGHToken();
   if(!token){showGHPanel();return;}
-  const btn=document.getElementById('cfgSaveGHBtn');
+  const btn=document.getElementById('cfgApplyBtn');
   btn.textContent='⏳ Guardando...';btn.disabled=true;
 
   try{
