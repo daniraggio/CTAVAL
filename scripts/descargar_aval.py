@@ -11,10 +11,11 @@ Lógica:
 Ruta en el repo: scripts/descargar_aval.py
 """
 
-import requests
-from datetime import datetime, date
+import requests, json, calendar
+from datetime import datetime, date, timedelta
 from pathlib import Path
-import calendar
+
+CONFIG_PATH = Path(__file__).resolve().parent.parent / 'data' / 'config.json'
 
 BASE_URL   = "http://orazul.cilary.com"
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -84,6 +85,55 @@ def descargar_mes(session, year, month):
     return destino
 
 
+def fetch_tc_bcra(year, month):
+    """Obtiene TC Com.3500 del último día hábil del mes desde API BCRA oficial."""
+    import urllib3; urllib3.disable_warnings()
+    hoy = date.today()
+    is_current = (year == hoy.year and month == hoy.month)
+    if is_current:
+        date_to   = hoy - timedelta(days=1)
+        date_from = date_to - timedelta(days=6)
+    else:
+        last_day  = date(year, month, calendar.monthrange(year, month)[1])
+        date_from = last_day - timedelta(days=9)
+        date_to   = last_day
+
+    url = (f"https://api.bcra.gob.ar/estadisticascambiarias/v3.0/Cotizaciones/USD"
+           f"?fechadesde={date_from}&fechahasta={date_to}")
+    try:
+        resp = requests.get(url, timeout=15, verify=False)
+        resp.raise_for_status()
+        for day in reversed(resp.json().get("results", [])):
+            for det in (day.get("detalle") or []):
+                if "3500" in det.get("descripcion", ""):
+                    tc = float(det.get("tipoCotizacion", 0))
+                    if tc > 0:
+                        print(f"     TC Com.3500 {year}/{month:02d}: ${tc:,.4f} ({day['fecha']})")
+                        return tc, day["fecha"]
+    except Exception as e:
+        print(f"     ⚠ BCRA API: {e}")
+    return None, None
+
+
+def update_config_tc(meses):
+    """Actualiza TC en config.json para cada mes.""""
+    cfg = {}
+    if CONFIG_PATH.exists():
+        try: cfg = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
+        except: pass
+    month_cfg = cfg.setdefault("MONTH_CFG", {})
+    updated = False
+    for year, month in meses:
+        tc, tc_date = fetch_tc_bcra(year, month)
+        if tc:
+            mk = f"{year}_{month:02d}"
+            month_cfg.setdefault(mk, {}).update({"TC": tc, "TCDate": tc_date})
+            updated = True
+    if updated:
+        CONFIG_PATH.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding='utf-8')
+        print("     ✅ config.json actualizado con TC Com.3500")
+
+
 def descargar_planillas():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     now = datetime.now()
@@ -103,6 +153,7 @@ def descargar_planillas():
         descargar_mes(session, year, month)
 
     print(f"\n✅ Descarga completada ({len(meses)} archivo/s)")
+    update_config_tc(meses)
 
 
 if __name__ == "__main__":
