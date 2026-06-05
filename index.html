@@ -183,6 +183,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — acumulado diario</div></div></div>
       <div class="cw"><canvas id="cEnergiaRes" role="img" aria-label="Energía diaria por activo"></canvas></div>
     </div>
+    <div id="resumen-ayer" style="text-align:right;padding:4px 8px;margin-bottom:6px;min-height:20px"></div>
     <div class="card" style="padding:20px 24px">
       <div class="card-title" style="margin-bottom:14px">Resumen del mes</div>
       <div id="tbl-resumen-kpi"></div>
@@ -697,7 +698,71 @@ const MONTH_KP_DEFAULTS = {
   '06':1.1,'07':1.1,'08':1.1,'09':0.9,'10':0.9,'11':0.9,'12':1.1
 };
 
-function getTC(){return MONTH_CFG[MONTH]?.TC||1200;}
+// TC cache per month key: {tc, date, fetched}
+const TC_CACHE={};
+
+async function fetchTCFromBCRA(monthKey){
+  // monthKey = '2026_04' → we need last business day of that month
+  const [y,m]=monthKey.split('_').map(Number);
+  const today=new Date();
+  const isCurrent=(y===today.getFullYear()&&m===(today.getMonth()+1));
+
+  // Date range: last 10 days of the month (to catch last business day)
+  let dateFrom,dateTo;
+  if(isCurrent){
+    // For current month: last 5 calendar days up to yesterday
+    const yest=new Date(today); yest.setDate(yest.getDate()-1);
+    const from=new Date(yest); from.setDate(from.getDate()-6);
+    dateFrom=from.toISOString().slice(0,10);
+    dateTo=yest.toISOString().slice(0,10);
+  } else {
+    // For past months: last 10 days of the month
+    const lastDay=new Date(y,m,0); // last day of month
+    const from=new Date(lastDay); from.setDate(from.getDate()-9);
+    dateFrom=from.toISOString().slice(0,10);
+    dateTo=lastDay.toISOString().slice(0,10);
+  }
+
+  const url=`https://api.bcra.gob.ar/estadisticascambiarias/v3.0/Cotizaciones/USD?fechadesde=${dateFrom}&fechahasta=${dateTo}`;
+  try{
+    const resp=await fetch(url,{headers:{'Accept':'application/json'}});
+    if(!resp.ok) throw new Error('BCRA API error '+resp.status);
+    const data=await resp.json();
+    // Find Com 3500 (codigoDivisa=USD, descripcion contains 3500)
+    // Response: {results:[{fecha,detalle:[{codigoMoneda,descripcion,tipoPase,tipoCotizacion}]}]}
+    const results=data.results||[];
+    // Get last available date with Com 3500
+    for(let i=results.length-1;i>=0;i--){
+      const day=results[i];
+      const det=(day.detalle||[]).find(d=>d.descripcion&&d.descripcion.includes('3500'));
+      if(det&&det.tipoCotizacion){
+        return {tc:parseFloat(det.tipoCotizacion),date:day.fecha};
+      }
+    }
+    throw new Error('No se encontró Com 3500 en el rango');
+  }catch(e){
+    console.warn('BCRA TC fetch failed:',e.message);
+    return null;
+  }
+}
+
+function getTC(){
+  const cached=TC_CACHE[MONTH];
+  return cached?.tc || MONTH_CFG[MONTH]?.TC || 1200;
+}
+
+function getTCDate(){
+  return TC_CACHE[MONTH]?.date||null;
+}
+
+async function ensureTC(){
+  if(TC_CACHE[MONTH]?.tc) return;
+  const result=await fetchTCFromBCRA(MONTH);
+  if(result){
+    TC_CACHE[MONTH]={tc:result.tc,date:result.date};
+    if(MONTH_CFG[MONTH]) MONTH_CFG[MONTH].TC=result.tc;
+  }
+}
 function getKP(){return MONTH_CFG[MONTH]?.KP||0.9;}
 // FRC por fecha: busca solo en las quincenas del mes seleccionado
 function getFRC(fecha){
@@ -721,9 +786,7 @@ function saveConfig(){
   CFG.TRANSPORTE=parseFloat(document.getElementById('cfgTRANSPORTE').value)||2;
   CFG.ENRE=parseFloat(document.getElementById('cfgENRE').value)||(1658007/3);
   Object.keys(MONTH_CFG).forEach(mk=>{
-    const tcEl=document.getElementById(`cfgTC_${mk}`);
     const kpEl=document.getElementById(`cfgKP_${mk}`);
-    if(tcEl)MONTH_CFG[mk].TC=parseFloat(tcEl.value)||1200;
     if(kpEl)MONTH_CFG[mk].KP=parseFloat(kpEl.value)||0.9;
     // Quincenas
     const q1d=document.getElementById(`cfgQ1d_${mk}`);
@@ -1214,7 +1277,7 @@ function showSec(id){
 const built=new Set();
 function buildSection(id){
   if(built.has(id))return;built.add(id);
-  ({resumen:buildResumen,resumenUSD:buildResumenUSD,energia:buildEnergia,cmo:buildCmo,
+  ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),energia:buildEnergia,cmo:buildCmo,
     combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,estoperativo:buildEstOperativo,
     costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,rentamarginal:buildRentaMarginal,
     heatmap:buildHeatmap,config:buildConfig})[id]?.();
@@ -1239,7 +1302,8 @@ function mkResumenTable(rows){
     }).join('')}</tbody></table>`;
 }
 
-function buildResumen(){
+async function buildResumen(){
+  await ensureTC();
   const {eMWh}=getComputedTotals();
   const remE=calcRemEnergia();
   // Count COP hours across all machines for info
@@ -1349,9 +1413,29 @@ function buildResumen(){
     })(),
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
+
+  // Show yesterday's generation if current month
+  const todayStr=new Date().toISOString().slice(0,10);
+  const monthStr=MONTH.replace('_','-').slice(0,7); // '2026-05'
+  if(todayStr.startsWith(monthStr)){
+    const yest=new Date(); yest.setDate(yest.getDate()-1);
+    const yestStr=yest.toISOString().slice(0,10);
+    let eYest=0;
+    MKEYS.forEach(m=>{
+      const r=getRows(EKEYS[m]).find(x=>x.fecha===yestStr);
+      if(r) eYest+=r.h?r.h.reduce((a,b)=>a+(b||0),0):(r.avg||0)*24;
+    });
+    if(eYest>0){
+      const yestLabel=`${yestStr.slice(8)}-${yestStr.slice(5,7)}-${yestStr.slice(0,4)}`;
+      const yestEl=document.getElementById('resumen-ayer');
+      if(yestEl) yestEl.innerHTML=`<span style="color:var(--muted);font-size:12px">Generación ${yestLabel}:</span> <span style="font-family:var(--mono);font-weight:700;color:var(--text)">${Math.round(eYest).toLocaleString('es-AR')} MWh</span>`;
+    }
+  }
+  const tcDate=getTCDate();
+  const tcDateStr=tcDate?` · ${tcDate.slice(8)}-${tcDate.slice(5,7)}-${tcDate.slice(0,4)}`:'';
   document.getElementById('tbl-resumen-tc').innerHTML=
     `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
-    `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD</span>`;
+    `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${tcDateStr}</span>`;
 
   // GA hours card
   const gaH={};let gaTotal=0;
@@ -1383,7 +1467,7 @@ function _buildResumenCharts(eChartId,_legId,cmoChartId,usdMode){
 }
 
 // ── RESUMEN USD ────────────────────────────────────────────────────────────
-function buildResumenUSD(){_renderResumenUSD();}
+async function buildResumenUSD(){await ensureTC();_renderResumenUSD();}
 function rebuildUSD(){_renderResumenUSD();}
 function _renderResumenUSD(){
   const {eMWh}=getComputedTotals();
@@ -1430,9 +1514,11 @@ function _renderResumenUSD(){
     {label:'Rem. − Costos',       val:u+fmtFull(net_usd),                     unit:'', b:true, result:true, color:net_usd>=0?'var(--success)':'var(--danger)'},
   ];
   document.getElementById('tbl-resumenUSD-kpi').innerHTML=mkResumenTable(kpiRows);
+  const _tcDate2=getTCDate();
+  const _tcDs2=_tcDate2?` · ${_tcDate2.slice(8)}-${_tcDate2.slice(5,7)}-${_tcDate2.slice(0,4)}`:'';
   document.getElementById('tbl-resumenUSD-tc').innerHTML=
     `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
-    `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD</span>`;
+    `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${_tcDs2}</span>`;
   _buildResumenCharts('cEnergiaResUSD',null,null,true);
 }
 
@@ -1759,7 +1845,6 @@ function buildConfig(){
     grid.innerHTML=Object.keys(MONTH_CFG).map(mk=>`
       <div class="cfg-card" style="min-width:320px">
         <div class="cfg-title">${MONTH_META[mk].label}</div>
-        <div class="cfg-row"><label>Tipo de cambio ARS/USD</label><input class="cfg-inp" type="number" id="cfgTC_${mk}" value="${MONTH_CFG[mk].TC}" step="0.0001"></div>
         <div class="cfg-row"><label>Kp — factor de potencia</label><input class="cfg-inp" type="number" id="cfgKP_${mk}" value="${MONTH_CFG[mk].KP}" step="0.01" min="0" max="1"></div>
         <div style="margin:14px 0 6px;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">1° Quincena</div>
         <div class="cfg-row"><label>Desde</label><input class="cfg-inp" type="date" id="cfgQ1d_${mk}" value="${MONTH_CFG[mk].Q1d||''}" style="width:140px"></div>
