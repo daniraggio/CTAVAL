@@ -175,10 +175,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
         <div id="tbl-resumen-tc" style="display:inline-block"></div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Kp potencia</div>
-        <div id="tbl-resumen-kp" style="display:inline-block;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text)"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Producción con gas propio</div>
         <div id="tbl-resumen-ga" style="display:inline-block"></div>
       </div>
@@ -706,60 +702,52 @@ const MONTH_KP_DEFAULTS = {
 const TC_CACHE={};
 
 async function fetchTCFromBCRA(monthKey){
-  // monthKey = '2026_04' → we need last business day of that month
   const [y,m]=monthKey.split('_').map(Number);
   const today=new Date();
   const isCurrent=(y===today.getFullYear()&&m===(today.getMonth()+1));
 
-  // Date range: last 10 days of the month (to catch last business day)
+  // Build date range
   let dateFrom,dateTo;
   if(isCurrent){
-    // For current month: last 5 calendar days up to yesterday
     const yest=new Date(today); yest.setDate(yest.getDate()-1);
     const from=new Date(yest); from.setDate(from.getDate()-6);
     dateFrom=from.toISOString().slice(0,10);
     dateTo=yest.toISOString().slice(0,10);
   } else {
-    // For past months: last 10 days of the month
-    const lastDay=new Date(y,m,0); // last day of month
+    const lastDay=new Date(y,m,0);
     const from=new Date(lastDay); from.setDate(from.getDate()-9);
     dateFrom=from.toISOString().slice(0,10);
     dateTo=lastDay.toISOString().slice(0,10);
   }
 
-  // Try official BCRA API, fallback to estadisticasbcra.com
-  const url=`https://api.bcra.gob.ar/estadisticascambiarias/v3.0/Cotizaciones/USD?fechadesde=${dateFrom}&fechahasta=${dateTo}`;
+  // Use dolarapi.com — CORS-friendly, no auth, returns Com.3500 oficial
   try{
-    const resp=await fetch(url,{headers:{'Accept':'application/json'}});
-    if(!resp.ok) throw new Error('BCRA API error '+resp.status);
-    const data=await resp.json();
-    // Find Com 3500 (codigoDivisa=USD, descripcion contains 3500)
-    // Response: {results:[{fecha,detalle:[{codigoMoneda,descripcion,tipoPase,tipoCotizacion}]}]}
-    const results=data.results||[];
-    // Get last available date with Com 3500
-    for(let i=results.length-1;i>=0;i--){
-      const day=results[i];
-      const det=(day.detalle||[]).find(d=>d.descripcion&&d.descripcion.includes('3500'));
-      if(det&&det.tipoCotizacion){
-        return {tc:parseFloat(det.tipoCotizacion),date:day.fecha};
-      }
-    }
-    throw new Error('No se encontró Com 3500 en el rango');
+    const url=`https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial`;
+    const resp=await fetch(url);
+    if(!resp.ok) throw new Error('argentinadatos '+resp.status);
+    const arr=await resp.json();
+    if(!arr||!arr.length) throw new Error('empty response');
+    // Filter by date range and get last available
+    const inRange=arr.filter(x=>x.fecha>=dateFrom&&x.fecha<=dateTo);
+    const data=inRange.length?inRange:arr;
+    const last=data[data.length-1];
+    // venta = selling rate ≈ Com.3500
+    return {tc:parseFloat(last.venta||last.compra),date:last.fecha};
   }catch(e){
-    console.warn('BCRA primary API failed:',e.message,'. Trying fallback...');
-    // Fallback: estadisticasbcra.com (no auth needed for this endpoint)
-    try{
-      const fb=await fetch(`https://api.estadisticasbcra.com/usd_of?desde=${dateFrom}&hasta=${dateTo}`);
-      if(fb.ok){
-        const arr=await fb.json();
-        if(arr&&arr.length){
-          const last=arr[arr.length-1];
-          return {tc:parseFloat(last.v),date:last.d};
-        }
-      }
-    }catch(e2){console.warn('Fallback TC also failed:',e2.message);}
-    return null;
+    console.warn('argentinadatos failed:',e.message);
   }
+
+  // Fallback: BCRA oficial via another proxy
+  try{
+    const url2=`https://dolarapi.com/v1/dolares/oficial`;
+    const resp2=await fetch(url2);
+    if(resp2.ok){
+      const d=await resp2.json();
+      if(d&&d.venta) return {tc:parseFloat(d.venta), date:new Date().toISOString().slice(0,10)};
+    }
+  }catch(e2){console.warn('dolarapi fallback failed:',e2.message);}
+
+  return null;
 }
 
 function getTC(){
@@ -1428,14 +1416,14 @@ async function buildResumen(){
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
 
-  // Show yesterday's generation if current month
+  // Show last available day's generation
   const todayStr=new Date().toISOString().slice(0,10);
-  // Fix: MONTH='2026_06' → '2026-06'; handle single digit months too
   const [_my,_mm]=MONTH.split('_');
   const monthStr=`${_my}-${_mm.padStart(2,'0')}`;
-  if(todayStr.startsWith(monthStr)){
-    const yest=new Date(); yest.setDate(yest.getDate()-1);
-    const yestStr=yest.toISOString().slice(0,10);
+  const allAvailDates=allDates(Object.values(EKEYS));
+  const lastDate=allAvailDates.length?allAvailDates[allAvailDates.length-1]:null;
+  if(lastDate){
+    const yestStr=lastDate;
     let eYest=0;
     MKEYS.forEach(m=>{
       const r=getRows(EKEYS[m]).find(x=>x.fecha===yestStr);
@@ -1468,7 +1456,7 @@ async function buildResumen(){
       const yestEl=document.getElementById('resumen-ayer');
       if(yestEl) yestEl.innerHTML=`
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-          <span style="color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:10px">Ayer ${yestLabel}</span>
+          <span style="color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:10px">Último dato ${yestLabel}</span>
           <span style="color:var(--text)">Total: <b style="font-family:var(--mono)">${Math.round(eYest).toLocaleString('es-AR')} MWh</b></span>
           <span style="color:var(--muted)">${machineStr}</span>
           ${cmoStr}${costoStr}
@@ -1480,10 +1468,6 @@ async function buildResumen(){
   document.getElementById('tbl-resumen-tc').innerHTML=
     `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
     `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${tcDateStr}</span>`;
-
-  // KP display
-  const kpEl2=document.getElementById('tbl-resumen-kp');
-  if(kpEl2) kpEl2.textContent=getKP().toString().replace('.',',');
 
   // GA hours card
   const gaH={};let gaTotal=0;
