@@ -702,51 +702,13 @@ const MONTH_KP_DEFAULTS = {
 const TC_CACHE={};
 
 async function fetchTCFromBCRA(monthKey){
-  const [y,m]=monthKey.split('_').map(Number);
-  const today=new Date();
-  const isCurrent=(y===today.getFullYear()&&m===(today.getMonth()+1));
-
-  // Build date range
-  let dateFrom,dateTo;
-  if(isCurrent){
-    const yest=new Date(today); yest.setDate(yest.getDate()-1);
-    const from=new Date(yest); from.setDate(from.getDate()-6);
-    dateFrom=from.toISOString().slice(0,10);
-    dateTo=yest.toISOString().slice(0,10);
-  } else {
-    const lastDay=new Date(y,m,0);
-    const from=new Date(lastDay); from.setDate(from.getDate()-9);
-    dateFrom=from.toISOString().slice(0,10);
-    dateTo=lastDay.toISOString().slice(0,10);
+  // TC (Com.3500) is updated daily by GitHub Actions and stored in config.json
+  // Browser reads it from there — no direct API call needed
+  // This function is kept for future use or manual refresh
+  const cached=MONTH_CFG[monthKey];
+  if(cached&&cached.TC&&cached.TCDate){
+    return {tc:cached.TC, date:cached.TCDate};
   }
-
-  // Use dolarapi.com — CORS-friendly, no auth, returns Com.3500 oficial
-  try{
-    const url=`https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial`;
-    const resp=await fetch(url);
-    if(!resp.ok) throw new Error('argentinadatos '+resp.status);
-    const arr=await resp.json();
-    if(!arr||!arr.length) throw new Error('empty response');
-    // Filter by date range and get last available
-    const inRange=arr.filter(x=>x.fecha>=dateFrom&&x.fecha<=dateTo);
-    const data=inRange.length?inRange:arr;
-    const last=data[data.length-1];
-    // venta = selling rate ≈ Com.3500
-    return {tc:parseFloat(last.venta||last.compra),date:last.fecha};
-  }catch(e){
-    console.warn('argentinadatos failed:',e.message);
-  }
-
-  // Fallback: BCRA oficial via another proxy
-  try{
-    const url2=`https://dolarapi.com/v1/dolares/oficial`;
-    const resp2=await fetch(url2);
-    if(resp2.ok){
-      const d=await resp2.json();
-      if(d&&d.venta) return {tc:parseFloat(d.venta), date:new Date().toISOString().slice(0,10)};
-    }
-  }catch(e2){console.warn('dolarapi fallback failed:',e2.message);}
-
   return null;
 }
 
@@ -1455,11 +1417,27 @@ async function buildResumen(){
       const costoStr=costoYest>0?` &nbsp;|&nbsp; Costo gas: <b>$${Math.round(costoYest/1e6).toLocaleString('es-AR')}M</b>`:'';
       const yestEl=document.getElementById('resumen-ayer');
       if(yestEl) yestEl.innerHTML=`
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-          <span style="color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:10px">Último dato ${yestLabel}</span>
-          <span style="color:var(--text)">Total: <b style="font-family:var(--mono)">${Math.round(eYest).toLocaleString('es-AR')} MWh</b></span>
-          <span style="color:var(--muted)">${machineStr}</span>
-          ${cmoStr}${costoStr}
+        <div style="background:var(--surface2);border:1px solid rgba(79,142,247,.35);border-radius:10px;padding:14px 20px;margin-top:6px">
+          <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Último dato disponible — ${yestLabel}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end">
+            <div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Generación total</div>
+              <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text)">${Math.round(eYest).toLocaleString('es-AR')} <span style="font-size:13px;color:var(--muted)">MWh</span></div>
+            </div>
+            ${MKEYS.filter(m=>eByM[m]>0).map((m,i)=>`
+            <div>
+              <div style="font-size:10px;color:${CL[i]};margin-bottom:2px">${m}</div>
+              <div style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text)">${Math.round(eByM[m]).toLocaleString('es-AR')} <span style="font-size:11px;color:var(--muted)">MWh</span></div>
+            </div>`).join('')}
+            ${cmoYest!=null?`<div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:2px">CMO promedio</div>
+              <div style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--warn)">${Math.round(cmoYest/1000).toLocaleString('es-AR')} <span style="font-size:11px;color:var(--muted)">k$/MWh</span></div>
+            </div>`:''}
+            ${costoYest>0?`<div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:2px">Costo gas</div>
+              <div style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--danger)">$${Math.round(costoYest/1e6).toLocaleString('es-AR')} <span style="font-size:11px;color:var(--muted)">M</span></div>
+            </div>`:''}
+          </div>
         </div>`;
     }
   }
