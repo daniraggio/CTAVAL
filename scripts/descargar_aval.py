@@ -98,8 +98,8 @@ def fetch_tc_bcra(year, month):
         date_from = last_day - timedelta(days=9)
         date_to   = last_day
 
-    # Variable 272 = Tipo de Cambio Mayorista Com. A 3500
-    url = (f"https://api.bcra.gob.ar/estadisticas/v3.0/monetarias/272"
+    # Variable 272 = Tipo de Cambio Mayorista Com. A 3500 — API v4.0
+    url = (f"https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/272"
            f"?desde={date_from}&hasta={date_to}&limit=20")
     print(f"     → Consultando BCRA Com.A 3500: {url}")
     try:
