@@ -183,7 +183,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — acumulado diario</div></div></div>
       <div class="cw"><canvas id="cEnergiaRes" role="img" aria-label="Energía diaria por activo"></canvas></div>
     </div>
-    <div id="resumen-ayer" style="text-align:right;padding:4px 8px;margin-bottom:6px;min-height:20px"></div>
+    <div id="resumen-ayer" style="margin-bottom:6px;min-height:20px"></div>
     <div class="card" style="padding:20px 24px">
       <div class="card-title" style="margin-bottom:14px">Resumen del mes</div>
       <div id="tbl-resumen-kpi"></div>
@@ -1438,7 +1438,7 @@ async function buildResumen(){
     }
   }
   const tcDate=getTCDate();
-  const tcDateStr=tcDate?` (${tcDate.slice(8)}/${tcDate.slice(5,7)}/${tcDate.slice(0,4)})`:'';
+  const tcDateStr=tcDate?` · ${tcDate.slice(8)}/${tcDate.slice(5,7)}/${tcDate.slice(0,4)}`:' · actualizando...';
   document.getElementById('tbl-resumen-tc').innerHTML=
     `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
     `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${tcDateStr}</span>`;
