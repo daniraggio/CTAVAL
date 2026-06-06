@@ -100,18 +100,27 @@ def fetch_tc_bcra(year, month):
 
     url = (f"https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones/USD"
            f"?fechaDesde={date_from}&fechaHasta={date_to}")
+    print(f"     → Consultando BCRA: {url}")
     try:
-        resp = requests.get(url, timeout=15, verify=False)
+        resp = requests.get(url, timeout=30, verify=False,
+                           headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
+        print(f"     → Status: {resp.status_code}")
         resp.raise_for_status()
-        for day in reversed(resp.json().get("results", [])):
+        data = resp.json()
+        results = data.get("results", [])
+        print(f"     → Resultados: {len(results)} días")
+        for day in reversed(results):
             for det in (day.get("detalle") or []):
                 if "3500" in det.get("descripcion", ""):
                     tc = float(det.get("tipoCotizacion", 0))
                     if tc > 0:
                         print(f"     TC Com.3500 {year}/{month:02d}: ${tc:,.4f} ({day['fecha']})")
                         return tc, day["fecha"]
+        print(f"     ⚠ No se encontró Com.3500 en los resultados")
+        if results:
+            print(f"     → Primer resultado: {results[0]}")
     except Exception as e:
-        print(f"     ⚠ BCRA API: {e}")
+        print(f"     ⚠ BCRA API error: {type(e).__name__}: {e}")
     return None, None
 
 
