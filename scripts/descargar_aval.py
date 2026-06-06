@@ -99,26 +99,18 @@ def fetch_tc_bcra(year, month):
         date_to   = last_day
 
     SERIE = "175.1_DR_REFE500_0_0_25"
-    url = (
-        "https://apis.datos.gob.ar/series/api/series"
-        f"?ids={SERIE}"
-        f"&start_date={date_from}"
-        f"&end_date={date_to}"
-        "&format=json&limit=20"
-    )
-    print(f"     → Consultando Com.A 3500: {date_from} a {date_to}")
+    url = "https://apis.datos.gob.ar/series/api/series?ids=" + SERIE + "&format=json&last=1"
+    print(f"     → Consultando Com.A 3500 (último valor)...")
     try:
         resp = requests.get(url, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        rows = data.get("data", [])
-        # rows = [[fecha, valor], ...] — take last non-null
-        for fecha_v, valor in reversed(rows):
-            if valor is not None:
-                tc = float(valor)
-                print(f"     TC Com.A 3500 {year}/{month:02d}: ${tc:,.4f} ({fecha_v})")
-                return tc, fecha_v
-        print(f"     ⚠ Sin datos en el rango")
+        fecha_v, valor = data["data"][0]
+        if valor is not None:
+            tc = float(valor)
+            print(f"     TC Com.A 3500 {year}/{month:02d}: ${tc:,.4f} ({fecha_v})")
+            return tc, fecha_v
+        print("     ⚠ Valor nulo en la respuesta")
     except Exception as e:
         print(f"     ⚠ Error: {type(e).__name__}: {e}")
     return None, None
