@@ -98,8 +98,8 @@ def fetch_tc_bcra(year, month):
         date_from = last_day - timedelta(days=9)
         date_to   = last_day
 
-    url = (f"https://api.bcra.gob.ar/estadisticascambiarias/v3.0/Cotizaciones/USD"
-           f"?fechadesde={date_from}&fechahasta={date_to}")
+    url = (f"https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones/USD"
+           f"?fechaDesde={date_from}&fechaHasta={date_to}")
     try:
         resp = requests.get(url, timeout=15, verify=False)
         resp.raise_for_status()
