@@ -86,7 +86,7 @@ def descargar_mes(session, year, month):
 
 
 def fetch_tc_bcra(year, month):
-    """Obtiene TC Com.3500 del último día hábil del mes desde API BCRA oficial."""
+    """Obtiene TC Com.A 3500 (mayorista) desde API Principales Variables BCRA, variable 272."""
     import urllib3; urllib3.disable_warnings()
     hoy = date.today()
     is_current = (year == hoy.year and month == hoy.month)
@@ -98,9 +98,10 @@ def fetch_tc_bcra(year, month):
         date_from = last_day - timedelta(days=9)
         date_to   = last_day
 
-    url = (f"https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones/USD"
-           f"?fechaDesde={date_from}&fechaHasta={date_to}")
-    print(f"     → Consultando BCRA: {url}")
+    # Variable 272 = Tipo de Cambio Mayorista Com. A 3500
+    url = (f"https://api.bcra.gob.ar/estadisticas/v3.0/monetarias/272"
+           f"?desde={date_from}&hasta={date_to}&limit=20")
+    print(f"     → Consultando BCRA Com.A 3500: {url}")
     try:
         resp = requests.get(url, timeout=30, verify=False,
                            headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
@@ -109,16 +110,14 @@ def fetch_tc_bcra(year, month):
         data = resp.json()
         results = data.get("results", [])
         print(f"     → Resultados: {len(results)} días")
-        for day in reversed(results):
-            for det in (day.get("detalle") or []):
-                if "3500" in det.get("descripcion", ""):
-                    tc = float(det.get("tipoCotizacion", 0))
-                    if tc > 0:
-                        print(f"     TC Com.3500 {year}/{month:02d}: ${tc:,.4f} ({day['fecha']})")
-                        return tc, day["fecha"]
-        print(f"     ⚠ No se encontró Com.3500 en los resultados")
         if results:
-            print(f"     → Primer resultado: {results[0]}")
+            # Take last available value
+            last = results[-1]
+            tc = float(last.get("valor", 0))
+            fecha = last.get("fecha", str(date_to))
+            if tc > 0:
+                print(f"     TC Com.A 3500 {year}/{month:02d}: ${tc:,.4f} ({fecha})")
+                return tc, fecha
     except Exception as e:
         print(f"     ⚠ BCRA API error: {type(e).__name__}: {e}")
     return None, None
