@@ -86,10 +86,10 @@ def descargar_mes(session, year, month):
 
 
 def fetch_tc_bcra(year, month):
-    """Obtiene TC Com.A 3500 (mayorista) desde API Principales Variables BCRA, variable 272."""
-    import urllib3; urllib3.disable_warnings()
+    """Obtiene TC Com.A 3500 desde API datos.gob.ar — serie 175.1_DR_REFE500_0_0_25."""
     hoy = date.today()
     is_current = (year == hoy.year and month == hoy.month)
+
     if is_current:
         date_to   = hoy - timedelta(days=1)
         date_from = date_to - timedelta(days=6)
@@ -98,30 +98,30 @@ def fetch_tc_bcra(year, month):
         date_from = last_day - timedelta(days=9)
         date_to   = last_day
 
-    # Variable 272 = Tipo de Cambio Mayorista Com. A 3500 — API v4.0
-    url = (f"https://api.bcra.gob.ar/estadisticas/v4.0/Monetarias/272"
-           f"?desde={date_from}&hasta={date_to}&limit=20")
-    print(f"     → Consultando BCRA Com.A 3500: {url}")
+    SERIE = "175.1_DR_REFE500_0_0_25"
+    url = (
+        "https://apis.datos.gob.ar/series/api/series"
+        f"?ids={SERIE}"
+        f"&start_date={date_from}"
+        f"&end_date={date_to}"
+        "&format=json&limit=20"
+    )
+    print(f"     → Consultando Com.A 3500: {date_from} a {date_to}")
     try:
-        resp = requests.get(url, timeout=30, verify=False,
-                           headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
-        print(f"     → Status: {resp.status_code}")
+        resp = requests.get(url, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        results = data.get("results", [])
-        print(f"     → Resultados: {len(results)} días")
-        if results:
-            last = results[-1]
-            print(f"     → Estructura: {last}")
-            tc = float(last.get("valor", last.get("value", last.get("v", 0))))
-            fecha = last.get("fecha", last.get("date", last.get("d", str(date_to))))
-            if tc > 0:
-                print(f"     TC Com.A 3500 {year}/{month:02d}: ${tc:,.4f} ({fecha})")
-                return tc, fecha
+        rows = data.get("data", [])
+        # rows = [[fecha, valor], ...] — take last non-null
+        for fecha_v, valor in reversed(rows):
+            if valor is not None:
+                tc = float(valor)
+                print(f"     TC Com.A 3500 {year}/{month:02d}: ${tc:,.4f} ({fecha_v})")
+                return tc, fecha_v
+        print(f"     ⚠ Sin datos en el rango")
     except Exception as e:
-        print(f"     ⚠ BCRA API error: {type(e).__name__}: {e}")
+        print(f"     ⚠ Error: {type(e).__name__}: {e}")
     return None, None
-
 
 def update_config_tc(meses):
     """Actualiza TC en config.json para cada mes."""
