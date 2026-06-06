@@ -111,10 +111,10 @@ def fetch_tc_bcra(year, month):
         results = data.get("results", [])
         print(f"     → Resultados: {len(results)} días")
         if results:
-            # Take last available value
             last = results[-1]
-            tc = float(last.get("valor", 0))
-            fecha = last.get("fecha", str(date_to))
+            print(f"     → Estructura: {last}")
+            tc = float(last.get("valor", last.get("value", last.get("v", 0))))
+            fecha = last.get("fecha", last.get("date", last.get("d", str(date_to))))
             if tc > 0:
                 print(f"     TC Com.A 3500 {year}/{month:02d}: ${tc:,.4f} ({fecha})")
                 return tc, fecha
