@@ -116,7 +116,7 @@ def fetch_tc_bcra(year, month):
 
 
 def update_config_tc(meses):
-    """Actualiza TC en config.json para cada mes.""""
+    """Actualiza TC en config.json para cada mes."""
     cfg = {}
     if CONFIG_PATH.exists():
         try: cfg = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
