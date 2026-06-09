@@ -2,7 +2,7 @@ name: Actualizar Planillas AVAL
 
 on:
   schedule:
-    - cron: '0 10 * * *'   # 7 AM Argentina (UTC-3) — adelantado para compensar delays de GitHub Actions
+    - cron: '0 8 * * *'   # 5 AM Argentina (UTC-3) — adelantado para compensar delays de GitHub Actions
   workflow_dispatch:
 
 jobs:
