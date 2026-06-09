@@ -1580,14 +1580,14 @@ function buildCvpSection(secId,keys,labels,chartId,titleId,tblDbgId,tabsId){
     });
 
     if(a===-1){
-      const ds=keys.map((k,i)=>({label:labels[i],data:monthDates.map(d=>{const r=getRows(k).find(x=>x.fecha===d);return r?r.avg:null;}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
+      const ds=keys.map((k,i)=>({label:labels[i],data:monthDates.map(d=>{const r=getRows(k).find(x=>x.fecha===d);return r?r.avg:0;}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
       mkChart(chartId,{type:'line',data:{labels:monthDates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
       document.getElementById(titleId).textContent='CVP — todos';
       if(tblDbgId)document.getElementById(tblDbgId).innerHTML='<tr><td style="color:var(--muted);padding:12px">Seleccioná una máquina para ver el detalle horario.</td></tr>';
     } else {
       const k=keys[a];const rows=getRows(k);const col=CL[a];
-      const mData=monthDates.map(d=>{const r=rows.find(x=>x.fecha===d);return r?r.avg:null;});
-      mkChart(chartId,{type:'line',data:{labels:monthDates.map(fmtDate),datasets:[{label:`${labels[a]} $/MWh`,data:mData,borderColor:col,backgroundColor:col+'22',fill:true,tension:0.3,pointRadius:3,borderWidth:2,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+      const mData=monthDates.map(d=>{const r=rows.find(x=>x.fecha===d);return r?r.avg:0;});
+      mkChart(chartId,{type:'line',data:{labels:monthDates.map(fmtDate),datasets:[{label:`${labels[a]} $/MWh`,data:mData,borderColor:col,backgroundColor:col+'22',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}}});
       document.getElementById(titleId).textContent=`CVP — ${labels[a]}`;
       if(tblDbgId)buildDbgTable(tblDbgId,k);
     }
