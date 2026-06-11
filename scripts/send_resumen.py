@@ -103,15 +103,16 @@ def build_html_email():
 
 
 def send_email(html_body, subject):
-    resp = requests.post(
-        "https://api.resend.com/emails",
-        headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
-        json={"from": FROM_EMAIL, "to": TO_EMAILS, "subject": subject, "html": html_body},
-        timeout=30
-    )
-    if not resp.ok:
-        raise Exception(f"Error {resp.status_code}: {resp.text}")
-    print(f"  ✅ Mail enviado — ID: {resp.json().get('id')}")
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From']    = FROM_EMAIL
+    msg['To']      = ', '.join(TO_EMAILS)
+    msg.attach(MIMEText(html_body, 'html'))
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(GMAIL_USER, GMAIL_APP_PASS)
+        smtp.sendmail(FROM_EMAIL, TO_EMAILS, msg.as_string())
+    print(f"  ✅ Mail enviado a: {', '.join(TO_EMAILS)}")
 
 
 if __name__ == "__main__":
