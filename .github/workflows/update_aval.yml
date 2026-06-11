@@ -44,4 +44,5 @@ jobs:
       - name: Enviar resumen por mail
         env:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: python scripts/send_resumen.py
