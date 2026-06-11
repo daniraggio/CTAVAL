@@ -1396,11 +1396,11 @@ async function buildResumen(){
   ];
   document.getElementById('tbl-resumen-kpi').innerHTML=mkResumenTable(kpiRows);
 
-  // Show last available day's generation
+  // Show last available day's generation — filter to current month only
   const todayStr=new Date().toISOString().slice(0,10);
   const [_my,_mm]=MONTH.split('_');
   const monthStr=`${_my}-${_mm.padStart(2,'0')}`;
-  const allAvailDates=allDates(Object.values(EKEYS));
+  const allAvailDates=allDates(Object.values(EKEYS)).filter(d=>d.startsWith(monthStr));
   const lastDate=allAvailDates.length?allAvailDates[allAvailDates.length-1]:null;
   if(lastDate){
     const yestStr=lastDate;
