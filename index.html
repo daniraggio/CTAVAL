@@ -1328,7 +1328,7 @@ async function buildResumen(){
     })(),
     {label:'',val:'',unit:`Horas en estado COP: ${_copHours.toLocaleString('es-AR')} (en estas horas rem. = CVP sin renta)`},
     {label:'Rem. Potencia',     val:'$ '+fmtFull(remP.TOTAL*tc),     unit:'USD '+fmtFull(remP.TOTAL)+' — Σ(POT×Kp×PPAD) por hora',  },
-    {label:'',val:fmtN(remP.TOTAL/12,1)+' MW·hrp',unit:'Potencia × PPAD ÷ 12 — potencia media remunerada'},
+    {label:'Potencia remunerada',val:'',unit:fmtN(remP.TOTAL/12,1)+' MW·hrp — Potencia × PPAD ÷ 12'},
     {label:'Confiabilidad',     val:'$ '+fmtFull(remConf),            unit:fmtN(potMes,1)+' MW × '+CFG.CONF+' USD × TC',  },
     {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora'},
     {label:'Total Remuneraciones',val:'$ '+fmtFull(remGrand),         unit:'Energía + Potencia + Conf. + RPF',  b:true},
