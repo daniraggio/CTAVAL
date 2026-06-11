@@ -4,7 +4,9 @@ Toma screenshot del dashboard, lo sube a GitHub y manda el mail con URL pública
 Ruta en el repo: scripts/send_resumen.py
 """
 
-import os, base64, requests, json
+import os, base64, requests, smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText, json
 from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright
