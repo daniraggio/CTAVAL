@@ -1257,7 +1257,9 @@ function showSec(id){
 }
 const built=new Set();
 function buildSection(id){
-  if(built.has(id))return;built.add(id);
+  // resumen/resumenUSD are async — never cache them, always rebuild
+  const noCache=['resumen','resumenUSD'];
+  if(!noCache.includes(id)){if(built.has(id))return;built.add(id);}
   ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),energia:buildEnergia,cmo:buildCmo,
     combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,estoperativo:buildEstOperativo,
     costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,rentamarginal:buildRentaMarginal,
