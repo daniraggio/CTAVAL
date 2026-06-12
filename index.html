@@ -440,6 +440,7 @@ const SHEETS_NEEDED = [
   'AVALTG23-CVPCOMBREM-GX','AVALTG22-CVPCOMBREM-GX','AVALTV11-CVPCOMBREM-GX','AVALTV12-CVPCOMBREM-GX',
   'AVALTG23-CVPCOMBDESC-GX','AVALTG22-CVPCOMBDESC-GX','AVALTV11-CVPCOMBDESC-GX','AVALTV12-CVPCOMBDESC-GX',
   'AVALTG23-CVPCOMBDESP-GX','AVALTG22-CVPCOMBDESP-GX','AVALTV11-CVPCOMBDESP-GX','AVALTV12-CVPCOMBDESP-GX',
+  'cvp-AVALTG23-COMB','cvp-AVALTG22-COMB','cvp-AVALTV11-COMB','cvp-AVALTV12-COMB',
   'AVALTG22-CVPTRANSPREMPROV-GX','AVALTG23-CVPTRANSPREMPROV-GX','AVALTV11-CVPTRANSPREMPROV-GX','AVALTV12-CVPTRANSPREMPROV-GX',
   'AVALTG22-CVPOYMREM-GX','AVALTG23-CVPOYMREM-GX','PRECIOS-CMO',
   'AVALTG23-FACTOR_PERDIDAS','AVALTG22-FACTOR_PERDIDAS','AVALTV11-FACTOR_PERDIDAS','AVALTV12-FACTOR_PERDIDAS',
@@ -490,7 +491,7 @@ function parseSheet(wb, name) {
   }
 
   // Text mode: EST_REMUN sheets store state strings per hour
-  const isTextSheet = name.includes('EST_REMUN') || name.includes('ESTREMUN');
+  const isTextSheet = name.includes('EST_REMUN') || name.includes('ESTREMUN') || (name.startsWith('cvp-') && name.endsWith('-COMB'));
 
   // Extract date string using local components (timezone-safe)
   function cellDate(v) {
@@ -667,8 +668,6 @@ const MONTH_CFG = {};   // {key: {TC, KP, Q1combProp, Q2combProp, ...}}
 function ensureCombPropDefaults(mk){
   const mc=MONTH_CFG[mk];if(!mc)return;
   const def=MONTH_COMBPROP_DEFAULTS?.[mk]||{};
-  if(mc.Q1combProp===undefined)mc.Q1combProp=def.Q1combProp??false;
-  if(mc.Q2combProp===undefined)mc.Q2combProp=def.Q2combProp??false;
   // Apply KP default based on month number (last 2 chars of mk e.g. '2026_04' -> '04')
   if(mc.KP===undefined||mc.KP===0.9){
     const mm=mk.slice(-2);
@@ -731,15 +730,14 @@ async function ensureTC(){
 }
 function getKP(){return MONTH_CFG[MONTH]?.KP||0.9;}
 // FRC por fecha: busca solo en las quincenas del mes seleccionado
-function getFRC(fecha){
-  // Search all configured months for a quincena that covers this date
-  // This handles quincenas that cross month boundaries
-  for(const mk of Object.keys(MONTH_CFG)){
-    const mc=MONTH_CFG[mk];
-    if(mc.Q1d&&mc.Q1h&&fecha>=mc.Q1d&&fecha<=mc.Q1h) return mc.Q1combProp?1:0.8;
-    if(mc.Q2d&&mc.Q2h&&fecha>=mc.Q2d&&fecha<=mc.Q2h) return mc.Q2combProp?1:0.8;
-  }
-  return 0.8; // fecha no cubre ninguna quincena configurada
+// FRC por hora y máquina, según declaración GX (Gas Acuerdo, FRC=0,8) / GA (Gas Propio, FRC=1)
+// leída directamente de la hoja cvp-AVALxx-COMB
+function getFRC(m,fecha,h){
+  const row=getRows(COMBTYPEKEYS[m]).find(x=>x.fecha===fecha);
+  const tipo=row?.h?String(row.h[h]||'').trim():'';
+  if(tipo==='GA') return 1;
+  if(tipo==='GX') return 0.8;
+  return 0.8; // default si no hay declaración (GX)
 }
 
 function saveConfig(){
@@ -761,10 +759,6 @@ function saveConfig(){
     if(q1h)MONTH_CFG[mk].Q1h=q1h.value||'';
     if(q2d)MONTH_CFG[mk].Q2d=q2d.value||'';
     if(q2h)MONTH_CFG[mk].Q2h=q2h.value||'';
-    const cp1=document.getElementById(`cfgQ1combProp_${mk}`);
-    const cp2=document.getElementById(`cfgQ2combProp_${mk}`);
-    if(cp1)MONTH_CFG[mk].Q1combProp=cp1.checked;
-    if(cp2)MONTH_CFG[mk].Q2combProp=cp2.checked;
     ['TG23','TG22','TV11','TV12'].forEach(m=>{
       const c1=document.getElementById(`cfgQ1Comb${m}_${mk}`);
       const o1=document.getElementById(`cfgQ1Oym${m}_${mk}`);
@@ -959,6 +953,7 @@ function cvpAccum(priceKey,energyKey){
 const MKEYS=['TG23','TG22','TV11','TV12'];
 const EKEYS={TG23:'AVALTG23-ENERGIA',TG22:'AVALTG22-ENERGIA',TV11:'AVALTV11-ENERGIA',TV12:'AVALTV12-ENERGIA'};
 const COMBKEYS={TG23:'AVALTG23-CVPCOMBREM-GX',TG22:'AVALTG22-CVPCOMBREM-GX',TV11:'AVALTV11-CVPCOMBREM-GX',TV12:'AVALTV12-CVPCOMBREM-GX'};
+const COMBTYPEKEYS={TG23:'cvp-AVALTG23-COMB',TG22:'cvp-AVALTG22-COMB',TV11:'cvp-AVALTV11-COMB',TV12:'cvp-AVALTV12-COMB'};
 const DESCKEYS={TG23:'AVALTG23-CVPCOMBDESC-GX',TG22:'AVALTG22-CVPCOMBDESC-GX',TV11:'AVALTV11-CVPCOMBDESC-GX',TV12:'AVALTV12-CVPCOMBDESC-GX'};
 const DESPKEYS={TG23:'AVALTG23-CVPCOMBDESP-GX',TG22:'AVALTG22-CVPCOMBDESP-GX',TV11:'AVALTV11-CVPCOMBDESP-GX',TV12:'AVALTV12-CVPCOMBDESP-GX'};
 const ESTKEYS={TG23:'AVALTG23-EST_REMUN',TG22:'AVALTG22-EST_REMUN',TV11:'AVALTV11-EST_REMUN',TV12:'AVALTV12-EST_REMUN'};
@@ -1178,7 +1173,7 @@ function calcRemHour(m,fecha,h){
   const tc_rmin=getTC();const cvpUSD=tc_rmin>0?cvpTotal/tc_rmin:0;
   const RMIN_USD=cvpUSD<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
   const RMIN=RMIN_USD*tc_rmin;  // convert RMIN to ARS for comparison with diff×FRA
-  const FRC=getFRC(fecha);
+  const FRC=getFRC(m,fecha,h);
   const diff=Math.max(0,cmoFP-cvpTotal);
   // Check operational state: if COP, only CVP is remunerated (no renta margin)
   const estRow=getRows(ESTKEYS[m]).find(x=>x.fecha===fecha);
@@ -1306,6 +1301,7 @@ async function buildResumen(){
     allDates([EKEYS[m]]).forEach(fecha=>{
       for(let h=0;h<24;h++){
         const r=calcRemHour(m,fecha,h);if(!r)continue;
+        // Alt scenario: invert the declared fuel type (GA<->GX) for this hour
         const fA=r.FRC===1?0.8:1;
         // COP hours: only CVP, no RMIN no renta
         const remAlt=r.isCOP?r.cvpTotal:(r.cvpTotal+Math.max(r.RMIN,r.diff*CFG.FRA*fA));
@@ -1339,11 +1335,19 @@ async function buildResumen(){
       unit:'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E',
       },
     (()=>{
-      const mc2=MONTH_CFG[MONTH]||{};
-      const parts=[];
-      if(mc2.Q1d&&mc2.Q1h)parts.push(`1°Q: ${mc2.Q1combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
-      if(mc2.Q2d&&mc2.Q2h)parts.push(`2°Q: ${mc2.Q2combProp?'FRC=1 (comb. propio)':'FRC=0,8 (sin comb. propio)'}`);
-      return parts.length?{label:'',val:'',unit:parts.join(' | ')}:null;
+      // Count GA vs GX hours across all machines for the month
+      let gaHours=0,gxHours=0;
+      allDates(Object.values(EKEYS)).forEach(fecha=>{
+        MKEYS.forEach(m=>{
+          const r=getRows(COMBTYPEKEYS[m]).find(x=>x.fecha===fecha);
+          (r?.h||[]).forEach(v=>{
+            const t=String(v||'').trim();
+            if(t==='GA')gaHours++; else if(t==='GX')gxHours++;
+          });
+        });
+      });
+      if(gaHours+gxHours===0) return null;
+      return {label:'',val:'',unit:`Declaración combustible: GA (FRC=1) ${gaHours}h · GX (FRC=0,8) ${gxHours}h — fuente: cvp-AVAL-COMB`};
     })(),
     {label:'',val:'',unit:`Horas en estado COP: ${_copHours.toLocaleString('es-AR')} (en estas horas rem. = CVP sin renta)`},
     {label:'Rem. Potencia',     val:'$ '+fmtFull(remP.TOTAL*tc),     unit:'USD '+fmtFull(remP.TOTAL)+' — Σ(POT×Kp×PPAD) por hora',  },
@@ -1363,20 +1367,13 @@ async function buildResumen(){
     {label:'Rem. − Costos',     val:'$ '+fmtFull(netTotal),          unit:'Total Rem. − Total Costos',  b:true, result:true, color:netTotal>=0?'var(--success)':'var(--danger)'},
     {sep:true,label:'Control FRC'},
     (()=>{
-      const mc=MONTH_CFG[MONTH]||{};
       const remGrandAlt=_remEalt+remP.TOTAL*tc+remConf+remRPF;
       const netAlt=remGrandAlt-totalCostos;
       const diffAlt=remGrandAlt-remGrand;
       const sign=diffAlt>=0?'+':'−';
-      const q1frcAlt=mc.Q1combProp?'FRC=0,8':'FRC=1';
-      const q2frcAlt=mc.Q2combProp?'FRC=0,8':'FRC=1';
-      const lblAlt=[
-        mc.Q1d&&mc.Q1h?`1°Q: ${q1frcAlt}`:'',
-        mc.Q2d&&mc.Q2h?`2°Q: ${q2frcAlt}`:'',
-      ].filter(Boolean).join(' | ');
       return {label:'Rem. Energía con declaración de comb. inversa',
         val:'$ '+fmtFull(_remEalt),
-        unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diffAlt))}) — ${lblAlt}`,
+        unit:`Neto: $ ${fmtFull(netAlt)} (${sign}$ ${fmtFull(Math.abs(diffAlt))}) — invierte GA⇄GX hora a hora`,
         };
     })(),
     {sep:true,label:'Análisis'},
@@ -1882,14 +1879,12 @@ function buildConfig(){
         <div style="margin:14px 0 6px;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">1° Quincena</div>
         <div class="cfg-row"><label>Desde</label><input class="cfg-inp" type="date" id="cfgQ1d_${mk}" value="${MONTH_CFG[mk].Q1d||''}" style="width:140px"></div>
         <div class="cfg-row"><label>Hasta</label><input class="cfg-inp" type="date" id="cfgQ1h_${mk}" value="${MONTH_CFG[mk].Q1h||''}" style="width:140px"></div>
-        <div class="cfg-row"><label>Combustible Propio</label><input type="checkbox" id="cfgQ1combProp_${mk}" ${MONTH_CFG[mk].Q1combProp?'checked':''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer"></div>
         ${['TG23','TG22','TV11','TV12'].map(m=>`
         <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ1Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q1Comb||{})[m]||''}" step="0.01" style="width:130px"></div>
         ${m.startsWith('TV')?'':(`<div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ1Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q1Oym||{})[m]||''}" step="0.01" style="width:130px"></div>`)}`).join('')}
         <div style="margin:14px 0 6px;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">2° Quincena</div>
         <div class="cfg-row"><label>Desde</label><input class="cfg-inp" type="date" id="cfgQ2d_${mk}" value="${MONTH_CFG[mk].Q2d||''}" style="width:140px"></div>
         <div class="cfg-row"><label>Hasta</label><input class="cfg-inp" type="date" id="cfgQ2h_${mk}" value="${MONTH_CFG[mk].Q2h||''}" style="width:140px"></div>
-        <div class="cfg-row"><label>Combustible Propio</label><input type="checkbox" id="cfgQ2combProp_${mk}" ${MONTH_CFG[mk].Q2combProp?'checked':''} style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer"></div>
         ${['TG23','TG22','TV11','TV12'].map(m=>`
         <div class="cfg-row"><label style="font-size:11px">${m} CVP Comb ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ2Comb${m}_${mk}" value="${(MONTH_CFG[mk].Q2Comb||{})[m]||''}" step="0.01" style="width:130px"></div>
         ${m.startsWith('TV')?'':(`<div class="cfg-row"><label style="font-size:11px">${m} CVP O&M ($/MWh)</label><input class="cfg-inp" type="number" id="cfgQ2Oym${m}_${mk}" value="${(MONTH_CFG[mk].Q2Oym||{})[m]||''}" step="0.01" style="width:130px"></div>`)}`).join('')}
