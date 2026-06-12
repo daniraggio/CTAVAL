@@ -58,8 +58,18 @@ def descargar_mes(session, year, month):
         ("mes",      str(month)),
     ]
 
-    resp = session.post(f"{BASE_URL}/get_report", data=payload, timeout=60)
-    resp.raise_for_status()
+    import time
+    for attempt in range(2):
+        try:
+            resp = session.post(f"{BASE_URL}/get_report", data=payload, timeout=60)
+            resp.raise_for_status()
+            break
+        except requests.exceptions.HTTPError as e:
+            if attempt == 0:
+                print(f"     ⚠ Error en intento 1: {e} — reintentando en 60s...")
+                time.sleep(60)
+            else:
+                raise
     nombre_servidor = resp.text.strip()
     print(f"     Servidor: {nombre_servidor!r}")
 
