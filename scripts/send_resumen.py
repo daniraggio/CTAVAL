@@ -7,14 +7,15 @@ Ruta en el repo: scripts/send_resumen.py
 import os, base64, requests, json, smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+ARG_TZ = timezone(timedelta(hours=-3))
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 GMAIL_USER      = "jarvis.aconcagua@gmail.com"
 GMAIL_APP_PASS  = os.environ.get("GMAIL_APP_PASSWORD", "")
 FROM_EMAIL      = "jarvis.aconcagua@gmail.com"
-TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com"]
+TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
 
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
@@ -71,7 +72,7 @@ def upload_screenshot_to_github():
 
 
 def build_html_email():
-    now = datetime.now()
+    now = datetime.now(ARG_TZ)
     mes = MESES[now.month-1]
     fecha_str = now.strftime("%d/%m/%Y %H:%M")
     img_url = f"{IMG_PUBLIC_URL}?t={int(now.timestamp())}"
@@ -100,7 +101,7 @@ def build_html_email():
   </div>
 </body>
 </html>"""
-    subject = f"Central Térmica Alto Valle — {mes} {now.year} actualizado"
+    subject = f"Reporte Central Térmica Alto Valle — {now.day} de {mes} {now.year}"
     return html, subject
 
 
@@ -118,7 +119,7 @@ def send_email(html_body, subject):
 
 
 if __name__ == "__main__":
-    now = datetime.now()
+    now = datetime.now(ARG_TZ)
     print(f"[{now:%H:%M:%S}] Generando resumen...")
     try:
         take_screenshot()
