@@ -1,21 +1,23 @@
 """
 send_resumen.py
-Toma screenshot del dashboard, lo sube a GitHub y manda el mail con URL pública.
+Toma screenshot del dashboard, lo sube a GitHub y manda el mail via Gmail SMTP.
 Ruta en el repo: scripts/send_resumen.py
 """
 
-import os, base64, requests, smtplib, json
+import os, base64, requests, json, smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "re_ZwDtQ1e7_7WXxMVzRhuGffmoi7LSNwxz8")
+GMAIL_USER      = "danielraggio@gmail.com"
+GMAIL_APP_PASS  = os.environ.get("GMAIL_APP_PASSWORD", "")
+FROM_EMAIL      = "danielraggio@gmail.com"
+TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
+
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
-FROM_EMAIL      = "onboarding@resend.dev"
-TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
 DASHBOARD_URL   = "https://daniraggio.github.io/CTAVAL/"
 SCREENSHOT_PATH = Path("/tmp/resumen.png")
 IMG_REPO_PATH   = "screenshots/resumen_latest.png"
@@ -50,7 +52,6 @@ def upload_screenshot_to_github():
     }
     content = base64.b64encode(SCREENSHOT_PATH.read_bytes()).decode()
 
-    # Get current SHA if exists
     sha = None
     meta = requests.get(f"https://api.github.com/repos/{REPO}/contents/{IMG_REPO_PATH}", headers=hdrs)
     if meta.ok:
@@ -73,10 +74,9 @@ def build_html_email():
     now = datetime.now()
     mes = MESES[now.month-1]
     fecha_str = now.strftime("%d/%m/%Y %H:%M")
-    # Agregar timestamp para evitar cache del mail
     img_url = f"{IMG_PUBLIC_URL}?t={int(now.timestamp())}"
 
-    return f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#0d1117;font-family:system-ui,sans-serif">
@@ -95,11 +95,13 @@ def build_html_email():
       </a>
     </div>
     <div style="font-size:11px;color:#484f58;text-align:center;margin-top:24px">
-      Este mail se genera automáticamente todos los días a las 8 AM.
+      Este mail se genera automáticamente todos los días.
     </div>
   </div>
 </body>
-</html>""", f"Central Térmica Alto Valle — {mes} {now.year} actualizado"
+</html>"""
+    subject = f"Central Térmica Alto Valle — {mes} {now.year} actualizado"
+    return html, subject
 
 
 def send_email(html_body, subject):
