@@ -11,10 +11,10 @@ from datetime import datetime
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-GMAIL_USER      = "danielraggio@gmail.com"
+GMAIL_USER      = "jarvis.aconcagua@gmail.com"
 GMAIL_APP_PASS  = os.environ.get("GMAIL_APP_PASSWORD", "")
-FROM_EMAIL      = "danielraggio@gmail.com"
-TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
+FROM_EMAIL      = "jarvis.aconcagua@gmail.com"
+TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com"]
 
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
