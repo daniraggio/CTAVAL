@@ -4,7 +4,7 @@ Toma screenshot del dashboard, lo sube a GitHub y manda el mail via Gmail SMTP.
 Ruta en el repo: scripts/send_resumen.py
 """
 
-import os, base64, requests, json, smtplib
+import os, base64, requests, json, smtplib, hashlib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
@@ -23,6 +23,8 @@ DASHBOARD_URL   = "https://daniraggio.github.io/CTAVAL/"
 SCREENSHOT_PATH = Path("/tmp/resumen.png")
 IMG_REPO_PATH   = "screenshots/resumen_latest.png"
 IMG_PUBLIC_URL  = f"https://raw.githubusercontent.com/{REPO}/main/{IMG_REPO_PATH}"
+STATE_REPO_PATH = "data/.last_email_state.json"
+DATA_DIR        = Path(__file__).resolve().parent.parent / "data"
 
 MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
          "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
@@ -118,15 +120,65 @@ def send_email(html_body, subject):
     print(f"  ✅ Mail enviado a: {', '.join(TO_EMAILS)}")
 
 
+def current_month_xls():
+    """Devuelve el Path del .xls del mes actual (Argentina)."""
+    now = datetime.now(ARG_TZ)
+    return DATA_DIR / f"AVAL_{now.year}_{now.month:02d}.xls"
+
+
+def file_hash(path):
+    if not path.exists():
+        return None
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+def get_last_email_state():
+    hdrs = {"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json"}
+    resp = requests.get(f"https://api.github.com/repos/{REPO}/contents/{STATE_REPO_PATH}", headers=hdrs, timeout=30)
+    if not resp.ok:
+        return {}, None
+    data = resp.json()
+    sha = data.get("sha")
+    try:
+        content = base64.b64decode(data["content"]).decode()
+        return json.loads(content), sha
+    except Exception:
+        return {}, sha
+
+
+def save_email_state(state, sha):
+    hdrs = {"Authorization": f"Bearer {GH_TOKEN}", "Accept": "application/vnd.github+json"}
+    content = base64.b64encode(json.dumps(state, indent=2).encode()).decode()
+    body = {"message": "update last_email_state", "content": content, "branch": "main"}
+    if sha:
+        body["sha"] = sha
+    resp = requests.put(f"https://api.github.com/repos/{REPO}/contents/{STATE_REPO_PATH}", headers=hdrs, json=body, timeout=30)
+    if not resp.ok:
+        raise Exception(f"GitHub state update error: {resp.text}")
+
+
 if __name__ == "__main__":
     now = datetime.now(ARG_TZ)
     print(f"[{now:%H:%M:%S}] Generando resumen...")
     try:
-        take_screenshot()
-        upload_screenshot_to_github()
-        html, subject = build_html_email()
-        print(f"  → Enviando a: {', '.join(TO_EMAILS)}")
-        send_email(html, subject)
+        xls_path = current_month_xls()
+        current_hash = file_hash(xls_path)
+        state, state_sha = get_last_email_state()
+
+        if current_hash and state.get("hash") == current_hash:
+            print(f"  ℹ️  Sin novedades en {xls_path.name} desde el último mail — no se envía.")
+        else:
+            take_screenshot()
+            upload_screenshot_to_github()
+            html, subject = build_html_email()
+            print(f"  → Enviando a: {', '.join(TO_EMAILS)}")
+            send_email(html, subject)
+            if current_hash:
+                state["hash"] = current_hash
+                state["fecha"] = now.isoformat()
+                save_email_state(state, state_sha)
     except Exception as e:
         print(f"  ❌ Error: {e}")
         raise
