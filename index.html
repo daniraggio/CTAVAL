@@ -2390,14 +2390,7 @@ function initDashboard(loadedData) {
   });
   Object.assign(MONTH_META, loadedData.MONTH_META_DYN);
   Object.assign(MONTH_CFG, loadedData.MONTH_CFG_DYN);
-  // Apply known TC defaults (user can override in config)
-  const TC_DEFAULTS = {
-    '2026_03': 1450, '2026_04': 1381.0954, '2026_05': 1400
-  };
   Object.keys(MONTH_CFG).forEach(k => {
-    const tcDefault = TC_DEFAULTS[k];
-    if (tcDefault) MONTH_CFG[k].TC = tcDefault;
-    // Apply combProp defaults if not already set
     ensureCombPropDefaults(k);
   });
 
