@@ -96,34 +96,23 @@ def descargar_mes(session, year, month):
 
 
 def fetch_tc_bcra(year, month):
-    """Obtiene TC Com.A 3500 desde API datos.gob.ar — serie 175.1_DR_REFE500_0_0_25."""
-    hoy = date.today()
-    is_current = (year == hoy.year and month == hoy.month)
-
-    if is_current:
-        date_to   = hoy - timedelta(days=1)
-        date_from = date_to - timedelta(days=6)
-    else:
-        last_day  = date(year, month, calendar.monthrange(year, month)[1])
-        date_from = last_day - timedelta(days=9)
-        date_to   = last_day
-
-    SERIE = "175.1_DR_REFE500_0_0_25"
-    url = "https://apis.datos.gob.ar/series/api/series?ids=" + SERIE + "&format=json&last=1"
-    print(f"     → Consultando Com.A 3500 (último valor)...")
+    """Obtiene TC mayorista (≈ Com.A 3500) desde dolarapi.com/v1/dolares/mayorista.
+    Fuente actualizada a diario, sin lag, CORS abierto."""
     try:
-        resp = requests.get(url, timeout=30)
+        resp = requests.get("https://dolarapi.com/v1/dolares/mayorista", timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        fecha_v, valor = data["data"][0]
-        if valor is not None:
-            tc = float(valor)
-            print(f"     TC Com.A 3500 {year}/{month:02d}: ${tc:,.4f} ({fecha_v})")
+        tc = float(data.get("venta", 0))
+        fecha_iso = data.get("fechaActualizacion", "")
+        fecha_v = fecha_iso[:10] if fecha_iso else str(date.today())
+        if tc > 0:
+            print(f"     TC mayorista {year}/{month:02d}: ${tc:,.4f} ({fecha_v})")
             return tc, fecha_v
-        print("     ⚠ Valor nulo en la respuesta")
+        print("     ⚠ Valor inválido")
     except Exception as e:
         print(f"     ⚠ Error: {type(e).__name__}: {e}")
     return None, None
+
 
 def update_config_tc(meses):
     """Actualiza TC en config.json para cada mes."""
