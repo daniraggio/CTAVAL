@@ -118,6 +118,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="nav-label">Overview</div>
       <button class="ni active" onclick="showSec('resumen')"><span class="nd"></span>Resumen ($)</button>
       <button class="ni" onclick="showSec('resumenUSD')"><span class="nd"></span>Resumen (USD)</button>
+      <button class="ni" onclick="showSec('howitworks')"><span class="nd"></span>Cómo funciona</button>
     </div>
     <div class="nav-group">
       <div class="nav-label">Energía</div>
@@ -193,19 +194,33 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 
   <!-- RESUMEN USD -->
   <div class="sec" id="sec-resumenUSD">
-    <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio activo</div>
-      <div id="tbl-resumenUSD-tc" style="display:inline-block"></div>
+    <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:center;gap:32px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio</div>
+        <div id="tbl-resumenUSD-tc" style="display:inline-block"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Producción con gas propio</div>
+        <div id="tbl-resumenUSD-ga" style="display:inline-block"></div>
+      </div>
     </div>
     <div class="card" style="margin-bottom:18px">
       <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — acumulado diario</div></div></div>
       <div class="cw"><canvas id="cEnergiaResUSD" role="img" aria-label="Energía diaria USD"></canvas></div>
     </div>
+    <div id="resumenUSD-ayer" style="margin-bottom:6px;min-height:20px"></div>
     <div class="card" style="padding:20px 24px">
       <div class="card-title" style="margin-bottom:14px">Resumen del mes (USD)</div>
       <div id="tbl-resumenUSD-kpi"></div>
     </div>
     <canvas id="cCmoResUSD" style="display:none"></canvas>
+  </div>
+
+  <!-- COMO FUNCIONA -->
+  <div class="sec" id="sec-howitworks">
+    <div class="card" style="padding:24px 28px">
+      <div id="howitworks-content"></div>
+    </div>
   </div>
 
   <!-- ENERGÍA -->
@@ -1229,6 +1244,7 @@ const legendOpts={display:true,position:'bottom',labels:{color:'#7a8099',font:{s
 const SMETA={
   resumen:{title:'Resumen general',sub:'Acumulados del mes'},
   resumenUSD:{title:'Resumen en USD',sub:'Tipo de cambio configurable'},
+  howitworks:{title:'Cómo funciona este dashboard',sub:'Guía técnica completa — arquitectura, datos y fórmulas'},
   energia:{title:'Energía asignada',sub:'MWh por activo'},
   cmo:{title:'CMO — Costo Marginal Operado',sub:'$/MWh'},
   combrem:{title:'CVP Costo Combustible Rem.',sub:'$/MWh'},
@@ -1257,7 +1273,7 @@ function buildSection(id){
   // resumen/resumenUSD are async — never cache them, always rebuild
   const noCache=['resumen','resumenUSD'];
   if(!noCache.includes(id)){if(built.has(id))return;built.add(id);}
-  ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),energia:buildEnergia,cmo:buildCmo,
+  ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),howitworks:buildHowItWorks,energia:buildEnergia,cmo:buildCmo,
     combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,estoperativo:buildEstOperativo,
     costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,rentamarginal:buildRentaMarginal,
     heatmap:buildHeatmap,config:buildConfig})[id]?.();
@@ -1498,6 +1514,30 @@ function rebuildUSD(){_renderResumenUSD();}
 function _renderResumenUSD(){
   const {eMWh}=getComputedTotals();
   const remE=calcRemEnergia();
+  // Count COP hours across all machines for info
+  let _copHours=0;
+  MKEYS.forEach(m=>{
+    allDates([EKEYS[m]]).forEach(fecha=>{
+      const estRows=getRows(ESTKEYS[m]).find(x=>x.fecha===fecha);
+      if(!estRows)return;
+      const hrs=estRows.h||[];
+      hrs.forEach(v=>{if(v==='COP')_copHours++;});
+    });
+  });
+
+  // Calculate alt remE (FRC inverted)
+  let _remEalt=0;
+  MKEYS.forEach(m=>{
+    allDates([EKEYS[m]]).forEach(fecha=>{
+      for(let h=0;h<24;h++){
+        const r=calcRemHour(m,fecha,h);if(!r)continue;
+        const fA=r.FRC===1?0.8:1;
+        const remAlt=r.isCOP?r.cvpTotal:(r.cvpTotal+Math.max(r.RMIN,r.diff*CFG.FRA*fA));
+        _remEalt+=remAlt*r.e;
+      }
+    });
+  });
+
   const remP=calcRemPotencia();
   const potMes=calcPotMes();
   const tc=getTC();
@@ -1520,36 +1560,307 @@ function _renderResumenUSD(){
   const u='USD ';
   const kpiRows=[
     {sep:true,label:'Producción'},
-    {label:'Energía generada',    val:fmtFull(eMWh.TOTAL),                   unit:'MWh'},
-    {label:'Potencia del mes',    val:fmtN(potMes,2),                         unit:'MW'},
+    {label:'Energía generada',    val:fmtFull(eMWh.TOTAL),                   unit:'MWh — Σ TG23+TG22+TV11+TV12'},
+    {label:'Potencia del mes',    val:fmtN(potMes,1),                        unit:'MW — promedio horario Σ 4 máquinas'},
     {sep:true,label:'Remuneraciones'},
-    {label:'Rem. Energía',        val:u+fmtFull(toU(remE.TOTAL)),             unit:'', },
-    {label:'Rem. Potencia',       val:u+fmtFull(remP.TOTAL),                  unit:'($ '+fmtFull(remP.TOTAL*tc)+')', },
-    {label:'Confiabilidad',       val:u+fmtFull(remConf),                     unit:'', },
-    {label:'RPF',                 val:u+fmtFull(remRPF_usd),                  unit:''},
-    {label:'Total Remuneraciones',val:u+fmtFull(remGrand_usd),                unit:'', b:true},
+    {label:'Rem. Energía',        val:u+fmtFull(toU(remE.TOTAL)),
+      unit:'CVP + MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E',
+      },
+    (()=>{
+      let gaHours=0,gxHours=0;
+      allDates(Object.values(EKEYS)).forEach(fecha=>{
+        MKEYS.forEach(m=>{
+          const r=getRows(COMBTYPEKEYS[m]).find(x=>x.fecha===fecha);
+          (r?.h||[]).forEach(v=>{
+            const t=String(v||'').trim();
+            if(t==='GA')gaHours++; else if(t==='GX')gxHours++;
+          });
+        });
+      });
+      if(gaHours+gxHours===0) return null;
+      return {label:'',val:'',unit:`Declaración combustible: GA (FRC=1) ${gaHours}h · GX (FRC=0,8) ${gxHours}h — fuente: cvp-AVAL-COMB`};
+    })(),
+    {label:'',val:'',unit:`Horas en estado COP: ${_copHours.toLocaleString('es-AR')} (en estas horas rem. = CVP sin renta)`},
+    {label:'Rem. Potencia',       val:u+fmtFull(remP.TOTAL),                  unit:'(= $ '+fmtFull(remP.TOTAL*tc)+') — Σ(POT×Kp×PPAD) por hora', },
+    {label:'Potencia remunerada', val:'',                                     unit:fmtN(calcPotHRP(),0)+' MW·hrp — Σ POT_DISP en horas HRP'},
+    {label:'Confiabilidad',       val:u+fmtFull(remConf),                     unit:fmtN(potMes,1)+' MW × '+CFG.CONF+' USD', },
+    {label:'RPF',                 val:u+fmtFull(remRPF_usd),                  unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora'},
+    {label:'Total Remuneraciones',val:u+fmtFull(remGrand_usd),                unit:'Energía + Potencia + Conf. + RPF', b:true},
     {sep:true,label:'Costos'},
-    {label:'Costo Gas',           val:u+fmtFull(costoGas_usd),                unit:'', },
-    {label:'Canon del Agua',      val:u+fmtFull(canonAgua_usd),               unit:'('+fmtFull(eMWh.TOTAL)+' MWh × USD '+fmtN(CFG.CANON_AGUA/tc,2)+')', },
-    {label:'Transporte',          val:u+fmtN(transporte_usd,2),               unit:'', },
-    {label:'ENRE',                val:u+fmtN(enre_usd,2),                     unit:'', },
-    {label:'CAMMESA',             val:u+fmtFull(cammesa_usd),                 unit:'(0,04% × Total Rem.)', },
-    {label:'Imp. Déb/Cred',       val:u+fmtFull(impDebCred_usd),              unit:''},
-    {label:'Total Costos',        val:u+fmtFull(totalCostos_usd),             unit:'', b:true},
+    {label:'Costo Gas',           val:u+fmtFull(costoGas_usd),                unit:'Σ(CVP_CombRem + CVP_TranspProvRem) × E — por hora · 4 máquinas (TG23, TG22, TV11, TV12)'},
+    {label:'Canon del Agua',      val:u+fmtFull(canonAgua_usd),               unit:fmtFull(eMWh.TOTAL)+' MWh × USD '+fmtN(CFG.CANON_AGUA/tc,2), },
+    {label:'Transporte',          val:u+fmtN(transporte_usd,2),               unit:'valor fijo configurado', },
+    {label:'ENRE',                val:u+fmtN(enre_usd,2),                     unit:'valor fijo configurado (default 1.658.007 ÷ 3, en USD)'},
+    {label:'CAMMESA',             val:u+fmtFull(cammesa_usd),                 unit:'0,04% × Total Rem.', },
+    {label:'Imp. Déb/Cred',       val:u+fmtFull(impDebCred_usd),              unit:'0,6% × (Rem.−ENRE) + 0,6% × (Canon+Transp.)', color:'var(--danger)'},
+    {label:'Total Costos',        val:u+fmtFull(totalCostos_usd),             unit:'Σ todos los costos', b:true},
     {sep:true,label:'Resultado'},
-    {label:'Rem. − Costos',       val:u+fmtFull(net_usd),                     unit:'', b:true, result:true, color:net_usd>=0?'var(--success)':'var(--danger)'},
+    {label:'Rem. − Costos',       val:u+fmtFull(net_usd),                     unit:'Total Rem. − Total Costos', b:true, result:true, color:net_usd>=0?'var(--success)':'var(--danger)'},
+    {sep:true,label:'Control FRC'},
+    (()=>{
+      const remGrandAlt_usd=toU(_remEalt)+remP.TOTAL+remConf+remRPF_usd;
+      const netAlt_usd=remGrandAlt_usd-totalCostos_usd;
+      const diffAlt_usd=remGrandAlt_usd-remGrand_usd;
+      const sign=diffAlt_usd>=0?'+':'−';
+      return {label:'Rem. Energía con declaración de comb. inversa',
+        val:u+fmtFull(toU(_remEalt)),
+        unit:`Neto: ${u}${fmtFull(netAlt_usd)} (${sign}${u}${fmtFull(Math.abs(diffAlt_usd))}) — invierte GA⇄GX hora a hora`,
+        };
+    })(),
+    {sep:true,label:'Análisis'},
+    (()=>{
+      let rentaMarginal=0;
+      allDates(Object.values(EKEYS)).forEach(fecha=>{
+        for(let h=0;h<24;h++){
+          MKEYS.forEach(m=>{
+            const r=calcRemHour(m,fecha,h);if(!r)return;
+            rentaMarginal+=(r.isCOP?0:Math.max(r.RMIN,r.diff*CFG.FRA*r.FRC))*r.e;
+          });
+        }
+      });
+      return {label:'Renta Marginal',
+        val:u+fmtFull(toU(rentaMarginal)),
+        unit:'MAX(RMIN ; MAX(0 ; CMO×FP − CVP) × FRA × FRC) × E — Σ todas las máquinas y horas'};
+    })(),
   ];
   document.getElementById('tbl-resumenUSD-kpi').innerHTML=mkResumenTable(kpiRows);
+
+  // Último día reportado (en USD)
+  const [_my,_mm]=MONTH.split('_');
+  const monthStr=`${_my}-${_mm.padStart(2,'0')}`;
+  const allAvailDates=allDates(Object.values(EKEYS)).filter(d=>d.startsWith(monthStr));
+  const lastDate=allAvailDates.length?allAvailDates[allAvailDates.length-1]:null;
+  if(lastDate){
+    const yestStr=lastDate;
+    let eYest=0;
+    MKEYS.forEach(m=>{
+      const r=getRows(EKEYS[m]).find(x=>x.fecha===yestStr);
+      if(r) eYest+=r.h?r.h.reduce((a,b)=>a+(b||0),0):(r.avg||0)*24;
+    });
+    const yestLabel=`${yestStr.slice(8)}-${yestStr.slice(5,7)}-${yestStr.slice(0,4)}`;
+    const eByM={};
+    MKEYS.forEach(m=>{
+      const r=getRows(EKEYS[m]).find(x=>x.fecha===yestStr);
+      eByM[m]=r?(r.h?r.h.reduce((a,b)=>a+(b||0),0):(r.avg||0)*24):0;
+    });
+    const cmoRowY=getRows('PRECIOS-CMO').find(x=>x.fecha===yestStr);
+    const cmoYest=cmoRowY?(cmoRowY.h?cmoRowY.h.reduce((a,b)=>a+(b||0),0)/24:cmoRowY.avg):null;
+    const yestEl=document.getElementById('resumenUSD-ayer');
+    if(yestEl) yestEl.innerHTML=`
+      <div style="background:var(--surface2);border:1px solid rgba(79,142,247,.3);border-radius:10px;padding:14px 20px;margin-top:6px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:12px">Generación último día reportado — <span style="color:var(--accent)">${yestLabel}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-end">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Total</div>
+            <div style="font-family:var(--mono);font-size:26px;font-weight:700;color:var(--success)">${Math.round(eYest).toLocaleString('es-AR')} <span style="font-size:13px;font-weight:400;color:var(--muted)">MWh</span></div>
+          </div>
+          ${MKEYS.map((m)=>`
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${m}</div>
+            <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--purple)">${Math.round(eByM[m]).toLocaleString('es-AR')} <span style="font-size:11px;font-weight:400;color:var(--muted)">MWh</span></div>
+          </div>`).join('')}
+          ${cmoYest!=null?`<div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:3px">CMO promedio</div>
+            <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--warn)">${(cmoYest/tc).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div>
+          </div>`:''}
+        </div>
+      </div>`;
+  }
+
   const _tcDate2=getTCDate();
-  const _tcDs2=_tcDate2?` · ${_tcDate2.slice(8)}-${_tcDate2.slice(5,7)}-${_tcDate2.slice(0,4)}`:'';
+  const _tcDs2=_tcDate2?` · ${_tcDate2.slice(8)}/${_tcDate2.slice(5,7)}/${_tcDate2.slice(0,4)}`:' · actualizando...';
   document.getElementById('tbl-resumenUSD-tc').innerHTML=
     `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
     `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${_tcDs2}</span>`;
+
+  // GA hours card
+  const gaH={};let gaTotal=0;
+  MKEYS.forEach(m=>{
+    let h=0;
+    getRows(ESTKEYS_GA[m]).forEach(r=>{(r.h||[]).forEach(v=>{if(v==='==='||v==='Arr')h++;});});
+    gaH[m]=h; gaTotal+=h;
+  });
+  const gaLabel=gaTotal>0
+    ? `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--warn)">${gaTotal} h</span><span style="font-size:11px;color:var(--muted);margin-left:8px">${MKEYS.filter(m=>gaH[m]>0).map(m=>m+': '+gaH[m]+'h').join(' | ')}</span>`
+    : `<span style="font-size:13px;color:var(--muted)">Sin gas propio</span>`;
+  const gaElUSD=document.getElementById('tbl-resumenUSD-ga');
+  if(gaElUSD) gaElUSD.innerHTML=gaLabel;
+
   _buildResumenCharts('cEnergiaResUSD',null,null,true);
 }
 
 // ── ENERGÍA ────────────────────────────────────────────────────────────────
 let eActive=0;
+// ── COMO FUNCIONA ────────────────────────────────────────────────────────────
+function buildHowItWorks(){
+  const el=document.getElementById('howitworks-content');
+  if(!el)return;
+  const sec=(title,body)=>`
+    <div style="margin-bottom:28px">
+      <div style="font-size:15px;font-weight:700;color:var(--accent);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">${title}</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.7">${body}</div>
+    </div>`;
+  const code=t=>`<code style="background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-family:var(--mono);font-size:12px;color:var(--teal)">${t}</code>`;
+  const ul=items=>`<ul style="margin:8px 0 0 18px;padding:0">${items.map(i=>`<li style="margin-bottom:6px">${i}</li>`).join('')}</ul>`;
+
+  el.innerHTML=`
+    <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Gu\u00eda de reconstrucci\u00f3n del dashboard</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px">
+      Esta secci\u00f3n explica el dashboard de punta a punta, como si tuvieras que construirlo de nuevo sin conocerlo.
+      No es documentaci\u00f3n de referencia r\u00e1pida: es la l\u00f3gica completa, en orden, desde el origen de los datos hasta cada n\u00famero que ves en pantalla.
+    </div>
+
+    ${sec('1. \u00bfQu\u00e9 es esto y para qu\u00e9 sirve?', `
+      Este dashboard analiza la operaci\u00f3n mensual de la <b>Central T\u00e9rmica Alto Valle</b> (4 turbinas: TG23, TG22, TV11, TV12)
+      dentro del mercado el\u00e9ctrico mayorista argentino (CAMMESA). Cada mes, CAMMESA genera una planilla Excel ("PosOperativo")
+      con datos hora por hora de generaci\u00f3n, precios, costos variables de producci\u00f3n (CVP) y estados operativos.
+      El dashboard descarga esa planilla, la procesa en el navegador y calcula cu\u00e1nto deber\u00eda <b>cobrar</b> la central
+      (remuneraci\u00f3n por energ\u00eda + potencia + confiabilidad + RPF) y cu\u00e1nto <b>cuesta</b> operar (gas, canon, impuestos),
+      para llegar a un resultado neto mensual \u2014 y para <b>verificar que coincida con el DTE oficial</b> que emite CAMMESA.
+    `)}
+
+    ${sec('2. Arquitectura general', `
+      Todo es <b>un \u00fanico archivo HTML</b> (${code('index.html')}) con JS embebido \u2014 sin backend, sin build step.
+      Vive en dos lugares:
+      ${ul([
+        `<b>Dashboard A (p\u00fablico)</b>: GitHub Pages, ${code('https://daniraggio.github.io/CTAVAL/')}`,
+        `<b>Dashboard B (privado)</b>: copia del mismo archivo en un servidor interno (${code('10.203.16.33')})`,
+      ])}
+      El HTML <b>no contiene datos</b> \u2014 al cargar, hace ${code('fetch')} de las planillas .xls directamente desde el repo de GitHub
+      (${code('raw.githubusercontent.com/daniraggio/CTAVAL/main/data/')}) y las parsea en el browser con la librer\u00eda
+      <b>SheetJS (xlsx.full.min.js)</b>. Esto significa: cualquiera que abra la p\u00e1gina descarga y procesa todo localmente, no hay servidor de datos.
+    `)}
+
+    ${sec('3. El pipeline de datos: de CAMMESA al browser', `
+      Tres piezas automatizadas corren en <b>GitHub Actions</b> (workflow ${code('.github/workflows/update_aval.yml')}, cron diario ~3AM ARG):
+      ${ul([
+        `<b>${code('scripts/descargar_aval.py')}</b> \u2014 hace POST a ${code('orazul.cilary.com/get_report')} (servidor de CAMMESA/distribuidora)
+         pidiendo el reporte PosOperativo del mes actual (y el anterior si estamos en los primeros 5 d\u00edas del mes, porque el
+         reporte del mes pasado se sigue actualizando). Descarga el .xls y lo guarda en ${code('data/AVAL_YYYY_MM.xls')}.
+         Tambi\u00e9n consulta <b>dolarapi.com/v1/dolares/mayorista</b> (tipo de cambio mayorista, \u2248 Com.A 3500 BCRA, sin lag)
+         y guarda ${code('TC')} + ${code('TCDate')} en ${code('data/config.json')}.`,
+        `<b>Commit autom\u00e1tico</b> \u2014 el workflow hace ${code('git commit')} + push de los .xls y config.json actualizados al repo.`,
+        `<b>${code('scripts/send_resumen.py')}</b> \u2014 abre el dashboard con Playwright (headless Chromium), saca un screenshot
+         de la secci\u00f3n Resumen, lo sube al repo (${code('screenshots/resumen_latest.png')}), y manda un mail v\u00eda
+         <b>Gmail SMTP</b> (cuenta ${code('jarvis.aconcagua@gmail.com')}, App Password en secret ${code('GMAIL_APP_PASSWORD')})
+         a las direcciones configuradas en ${code('TO_EMAILS')}.`,
+      ])}
+      Resultado: cada ma\u00f1ana el repo tiene planillas frescas + TC actualizado, y llega un mail con el resumen visual.
+    `)}
+
+    ${sec('4. Carga y parseo de las planillas (en el browser)', `
+      Al abrir el dashboard, ${code('loadAllData()')} hace lo siguiente:
+      ${ul([
+        `Prueba (con HEAD requests) qu\u00e9 archivos ${code('AVAL_YYYY_MM.xls')} existen entre 2025-2027, para detectar qu\u00e9 meses hay disponibles.`,
+        `Para cada mes encontrado, descarga el .xls y lo parsea con SheetJS. De cada hoja relevante (lista ${code('SHEETS_NEEDED')})
+         extrae filas con formato: <b>fecha</b> (columna A) + <b>24 valores horarios</b> (columnas C a Z, una por hora del d\u00eda).`,
+        `Cada hoja queda como ${code('ALL_DATA[mes][nombreHoja] = {rows: [{fecha, avg, h:[...24 valores]}, ...]}')}.
+         <b>avg</b> = promedio de las horas con dato (igual que ${code('=AVERAGE()')} en Excel, ignora vac\u00edos).`,
+        `Hojas de <b>estado</b> (${code('EST_REMUN')}, ${code('cvp-AVALxx-COMB')}) se tratan como texto: cada hora guarda un c\u00f3digo
+         (${code('===')}=operaci\u00f3n normal, ${code('COP')}=costo operativo, ${code('lib')}=sin generaci\u00f3n, ${code('GA')}/${code('GX')}=tipo de gas).`,
+        `Al final descarga ${code('data/config.json')} (configuraci\u00f3n persistida \u2014 ver secci\u00f3n 8) y construye el dashboard.`,
+      ])}
+    `)}
+
+    ${sec('5. Las hojas que importan (por m\u00e1quina, TG23/TG22/TV11/TV12)', `
+      Cada c\u00e1lculo recorre las mismas 4 m\u00e1quinas. Las hojas clave por m\u00e1quina son:
+      ${ul([
+        `${code('AVALxx-ENERGIA')} \u2014 energ\u00eda generada por hora (MWh). Esta es la <b>base de todo</b>: si una hora tiene energ\u00eda > 0, esa hora "cuenta".`,
+        `${code('AVALxx-CVPCOMBREM-GX')} \u2014 costo variable de producci\u00f3n por <b>combustible</b>, en \$/MWh, por hora.`,
+        `${code('AVALxx-CVPTRANSPREMPROV-GX')} \u2014 CVP de <b>transporte de combustible</b> (solo existe para TG22/TG23).`,
+        `${code('AVALxx-CVPOYMREM-GX')} \u2014 CVP de <b>operaci\u00f3n y mantenimiento (O&M)</b>, \$/MWh (las 4 m\u00e1quinas).`,
+        `${code('AVALxx-FACTOR_PERDIDAS')} \u2014 factor de p\u00e9rdidas de transporte (FP), multiplica al CMO.`,
+        `${code('AVALxx-EST_REMUN')} \u2014 estado operativo por hora (texto): ${code('===')}, ${code('COP')}, ${code('Arr')}, ${code('i-i')}, ${code('lib')}.`,
+        `${code('AVALxx-ESTREMUN-GA')} \u2014 horas declaradas con generaci\u00f3n "GA" (gas propio) para el cartel de "Producci\u00f3n con gas propio".`,
+        `${code('cvp-AVALxx-COMB')} \u2014 declaraci\u00f3n GX/GA por hora, usada para el <b>FRC</b> (ver secci\u00f3n 6).`,
+        `${code('AVALxx-POT_DISP')} \u2014 potencia disponible (MW) por hora, para Rem. Potencia.`,
+        `${code('AVALxx-PRECIO_NODO')}, ${code('AVALxx-RPF_GEN-PORC_RPF')} \u2014 usadas en c\u00e1lculos de RPF.`,
+        `Hojas globales (sin prefijo de m\u00e1quina): ${code('PRECIOS-CMO')} (Costo Marginal Operado, \$/MWh), ${code('PRECIOS-PPAD')}
+         (precio de potencia puesta a disposici\u00f3n, USD/MW), ${code('RPF-PRECIO_RPF')}.`,
+      ])}
+    `)}
+
+    ${sec('6. La f\u00f3rmula central: remuneraci\u00f3n por energ\u00eda', `
+      Para <b>cada hora y cada m\u00e1quina</b> con energ\u00eda > 0, ${code('calcRemHour(m,fecha,h)')} calcula:
+      <div class="formula-box" style="margin:12px 0">
+        CVP_TOTAL = CVP_Comb + CVP_Transp + CVP_OyM &nbsp;(en \$/MWh)<br>
+        CMO_FP = CMO \u00d7 FP<br>
+        RMIN_USD = 2 si (CVP_TOTAL / TC) &lt; 60, sino 7 &nbsp;\u2192&nbsp; RMIN = RMIN_USD \u00d7 TC<br>
+        diff = MAX(0, CMO_FP \u2212 CVP_TOTAL)<br>
+        FRC = 1 si la hora est\u00e1 declarada <b>GA</b> (gas propio), 0.8 si <b>GX</b> (gas de acuerdo)<br>
+        <b>REM = CVP_TOTAL + MAX(RMIN, diff \u00d7 FRA \u00d7 FRC)</b> &nbsp;&nbsp; (FRA = ${code('CFG.FRA')}, default 0.15)<br>
+        <span style="color:var(--warn)">Excepci\u00f3n: si el estado de la hora es COP \u2192 REM = CVP_TOTAL (sin renta adicional)</span>
+      </div>
+      El total mensual ${code('Rem. Energ\u00eda')} es ${code('\u03a3 (REM_hora \u00d7 E_hora)')} para las 1-4 m\u00e1quinas y todas las horas del mes
+      con generaci\u00f3n. <b>FRC se lee hora a hora</b> desde ${code('cvp-AVALxx-COMB')} \u2014 no es un valor manual configurado.
+    `)}
+
+    ${sec('7. El resto de las remuneraciones y los costos', `
+      ${ul([
+        `<b>Rem. Potencia</b> (USD) = ${code('\u03a3 POT_DISP_hora \u00d7 Kp \u00d7 PPAD_hora')}, solo en horas donde PPAD > 0 (horas HRP).
+         Kp depende del mes (verano=1.1, resto=0.9, configurable).`,
+        `<b>Potencia remunerada</b> = ${code('\u03a3 POT_DISP')} en esas mismas horas HRP, en MW\u00b7hrp \u2014 valor informativo.`,
+        `<b>Confiabilidad</b> = ${code('Potencia del mes (MW) \u00d7 CFG.CONF (USD/MW) \u00d7 TC')}.`,
+        `<b>RPF</b> = ${code('\u03a3 PRECIO_RPF_hora \u00d7 promedio(PORC_RPF de las 4 m\u00e1quinas)_hora / 100 \u00d7 \u03a3 Energ\u00eda_hora')}.`,
+        `<b>Costo Gas</b> = ${code('\u03a3 (CVP_Comb + CVP_Transp)_hora \u00d7 Energ\u00eda_hora')}, para las 4 m\u00e1quinas \u2014 es lo que "le cuesta" el gas a la central.`,
+        `<b>Canon del Agua</b> = ${code('Energ\u00eda total (MWh) \u00d7 CFG.CANON_AGUA (\$/MWh)')}.`,
+        `<b>CAMMESA</b> = ${code('0.04% \u00d7 Total Remuneraciones')}.`,
+        `<b>Imp. D\u00e9bitos/Cr\u00e9ditos</b> = ${code('0.6% \u00d7 (Total Rem. \u2212 ENRE) + 0.6% \u00d7 (Canon + Transporte)')}.`,
+        `<b>Resultado neto</b> = ${code('Total Remuneraciones \u2212 Total Costos')}.`,
+      ])}
+      Todos estos par\u00e1metros (FRA, RMIN, CONF, Canon, Transporte, ENRE, Kp, TC) son editables en <b>Configuraci\u00f3n</b>.
+    `)}
+
+    ${sec('8. Configuraci\u00f3n y persistencia (config.json)', `
+      ${ul([
+        `Los par\u00e1metros globales (FRA, RMIN, CONF, Canon, etc.) y por mes (TC, Kp, fechas de quincenas, valores declarados de
+         CVP Comb/O&M para Control de Remuneraciones) viven en ${code('data/config.json')} dentro del repo.`,
+        `Al cargar, el dashboard hace fetch de ese config.json y lo aplica sobre los defaults.`,
+        `El bot\u00f3n <b>"Guardar configuraci\u00f3n"</b> hace dos cosas: (1) recalcula todo localmente, y (2) sube el ${code('config.json')}
+         actualizado al repo v\u00eda la API de GitHub (requiere un <b>Personal Access Token</b> con scope ${code('repo')},
+         guardado solo en ${code('localStorage')} del navegador \u2014 nunca en el c\u00f3digo).`,
+        `El <b>TC (tipo de cambio)</b> de cada mes se actualiza autom\u00e1ticamente todos los d\u00edas por el workflow de Actions
+         (no es editable a mano) \u2014 siempre toma el \u00faltimo valor mayorista disponible.`,
+      ])}
+    `)}
+
+    ${sec('9. Publicar cambios al dashboard (publisher.html)', `
+      Cuando se edita ${code('index.html')} (nuevas features, fixes), hay que subir el HTML actualizado al repo. Esto se hace con
+      ${code('publisher.html')}: un archivo separado que contiene el ${code('index.html')} completo embebido como string JSON
+      (${code('HTML_CONTENT')}). Al abrirlo, pide el token de GitHub (mismo que el de Configuraci\u00f3n) y hace un PUT a la API
+      de contenidos de GitHub para sobreescribir ${code('index.html')} en el repo \u2192 GitHub Pages lo re-publica solo.
+    `)}
+
+    ${sec('10. Resumen del flujo completo (de punta a punta)', `
+      <div style="background:var(--surface2);border-left:3px solid var(--accent);border-radius:6px;padding:14px 18px">
+        1. CAMMESA genera el PosOperativo del mes \u2192
+        2. GitHub Actions (cron diario) descarga el .xls + actualiza TC desde dolarapi.com \u2192
+        3. Commit/push al repo \u2192
+        4. Usuario abre el dashboard \u2192 JS descarga los .xls + config.json desde GitHub \u2192
+        5. Se parsean las hojas hora por hora \u2192
+        6. Se calcula REM por hora/m\u00e1quina (CVP + renta seg\u00fan FRC GA/GX) \u2192
+        7. Se agregan Rem. Potencia, Confiabilidad, RPF, y se restan los Costos \u2192
+        8. Se muestra el Resumen (\$ y USD), comparable contra el DTE oficial de CAMMESA \u2192
+        9. GitHub Actions tambi\u00e9n genera un screenshot diario y lo manda por mail.
+      </div>
+    `)}
+
+    ${sec('11. Convenciones y nombres clave del c\u00f3digo', `
+      ${ul([
+        `${code("MKEYS = ['TG23','TG22','TV11','TV12']")} \u2014 orden est\u00e1ndar usado en todos los loops.`,
+        `${code('EKEYS, COMBKEYS, TRANSPKEYS, OYMKEYS, FPKEYS, POTKEYS, ESTKEYS, ESTKEYS_GA, COMBTYPEKEYS')} \u2014 diccionarios
+         m\u00e1quina \u2192 nombre de hoja, para cada tipo de dato.`,
+        `${code('GX')} = Gas de Acuerdo (CAMMESA) \u2192 FRC=0.8. ${code('GA')} = Gas Propio \u2192 FRC=1.`,
+        `${code('CC22')} = TG22+TV12, ${code('CC23')} = TG23+TV11 \u2014 "ciclos combinados", existen en la planilla pero
+         <b>no se usan</b> en los c\u00e1lculos (son redundantes con los valores individuales por m\u00e1quina).`,
+        `${code('getRows(sheetKey)')} \u2014 accesor central: devuelve las filas de una hoja para el mes seleccionado (${code('MONTH')}).`,
+        `${code('allDates(keys)')} \u2014 devuelve todas las fechas presentes en una o m\u00e1s hojas, ordenadas.`,
+        `${code('MONTH')} (variable global) \u2014 mes actualmente seleccionado, formato ${code("'YYYY_MM'")}.`,
+      ])}
+    `)}
+  `;
+}
+
 function buildEnergia(){
   const horas=MKEYS.map(m=>horasOperadas(EKEYS[m]));
   document.getElementById('kpi-energia').innerHTML=MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} — acumulado</div><div class="kpi-val" style="color:${CL[i]}">${fmtFull(monthlyMWh(EKEYS[m]))}</div><div class="kpi-unit">MWh · ${horas[i]}hs op.</div></div>`).join('')+
