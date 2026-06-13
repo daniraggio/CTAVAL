@@ -959,7 +959,7 @@ const DESPKEYS={TG23:'AVALTG23-CVPCOMBDESP-GX',TG22:'AVALTG22-CVPCOMBDESP-GX',TV
 const ESTKEYS={TG23:'AVALTG23-EST_REMUN',TG22:'AVALTG22-EST_REMUN',TV11:'AVALTV11-EST_REMUN',TV12:'AVALTV12-EST_REMUN'};
 const ESTKEYS_GA={TG23:'AVALTG23-ESTREMUN-GA',TG22:'AVALTG22-ESTREMUN-GA',TV11:'AVALTV11-ESTREMUN-GA',TV12:'AVALTV12-ESTREMUN-GA'};
 const TRANSPKEYS={TG22:'AVALTG22-CVPTRANSPREMPROV-GX',TG23:'AVALTG23-CVPTRANSPREMPROV-GX',TV11:'AVALTV11-CVPTRANSPREMPROV-GX',TV12:'AVALTV12-CVPTRANSPREMPROV-GX'};
-const OYMKEYS={TG22:'AVALTG22-CVPOYMREM-GX',TG23:'AVALTG23-CVPOYMREM-GX'};
+const OYMKEYS={TG23:'AVALTG23-CVPOYMREM-GX',TG22:'AVALTG22-CVPOYMREM-GX',TV11:'AVALTV11-CVPOYMREM-GX',TV12:'AVALTV12-CVPOYMREM-GX'};
 const FPKEYS={TG23:'AVALTG23-FACTOR_PERDIDAS',TG22:'AVALTG22-FACTOR_PERDIDAS',TV11:'AVALTV11-FACTOR_PERDIDAS',TV12:'AVALTV12-FACTOR_PERDIDAS'};
 const POTKEYS={TG23:'AVALTG23-POT_DISP',TG22:'AVALTG22-POT_DISP',TV11:'AVALTV11-POT_DISP',TV12:'AVALTV12-POT_DISP'};
 
@@ -973,10 +973,12 @@ function getComputedTotals(){
   cvp.combTotal=MKEYS.reduce((s,m)=>s+cvp['comb'+m],0);
   ['TG22','TG23'].forEach(m=>{
     cvp['transp'+m]=cvpAccum(TRANSPKEYS[m],EKEYS[m]);
+  });
+  MKEYS.forEach(m=>{
     cvp['oym'+m]=cvpAccum(OYMKEYS[m],EKEYS[m]);
   });
   cvp.transpTotal=(cvp.transpTG22||0)+(cvp.transpTG23||0);
-  cvp.oymTotal=(cvp.oymTG22||0)+(cvp.oymTG23||0);
+  cvp.oymTotal=MKEYS.reduce((s,m)=>s+(cvp['oym'+m]||0),0);
   cvp.TOTAL=cvp.combTotal+cvp.transpTotal+cvp.oymTotal;
   return{eMWh,cvp};
 }
@@ -1639,9 +1641,9 @@ function buildTranspProv(){
 }
 function buildOym(){
   const {cvp}=getComputedTotals();
-  document.getElementById('kpi-oym').innerHTML=['TG22','TG23'].map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} acumulado</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(cvp['oym'+m])}</div><div class="kpi-unit">$ mes</div></div>`).join('')+
+  document.getElementById('kpi-oym').innerHTML=MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} acumulado</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(cvp['oym'+m])}</div><div class="kpi-unit">$ mes</div></div>`).join('')+
     `<div class="kpi" style="border-color:rgba(79,142,247,.35)"><div class="kpi-lbl">TOTAL</div><div class="kpi-val a">${fmtK(cvp.oymTotal)}</div><div class="kpi-unit">$ mes</div></div>`;
-  buildCvpSection('oym',['AVALTG22-CVPOYMREM-GX','AVALTG23-CVPOYMREM-GX'],['TG22','TG23'],'cOym','oymTitle','tbl-oym-dbg','tabs-oym');
+  buildCvpSection('oym',['AVALTG23-CVPOYMREM-GX','AVALTG22-CVPOYMREM-GX','AVALTV11-CVPOYMREM-GX','AVALTV12-CVPOYMREM-GX'],MKEYS,'cOym','oymTitle','tbl-oym-dbg','tabs-oym');
 }
 
 // ── POTENCIA ───────────────────────────────────────────────────────────────
