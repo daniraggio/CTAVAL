@@ -1713,7 +1713,7 @@ function buildHowItWorks(){
       Vive en dos lugares:
       ${ul([
         `<b>Dashboard A (p\u00fablico)</b>: GitHub Pages, ${code('https://daniraggio.github.io/CTAVAL/')}`,
-        `<b>Dashboard B (privado)</b>: copia del mismo archivo en un servidor interno (${code('10.203.16.33')})`,
+        `<b>Dashboard B (privado)</b>: copia del mismo archivo en un servidor interno (${code('http://10.203.16.33/ctavav/index.html')})`,
       ])}
       El HTML <b>no contiene datos</b> \u2014 al cargar, hace ${code('fetch')} de las planillas .xls directamente desde el repo de GitHub
       (${code('raw.githubusercontent.com/daniraggio/CTAVAL/main/data/')}) y las parsea en el browser con la librer\u00eda
@@ -1732,7 +1732,8 @@ function buildHowItWorks(){
         `<b>${code('scripts/send_resumen.py')}</b> \u2014 abre el dashboard con Playwright (headless Chromium), saca un screenshot
          de la secci\u00f3n Resumen, lo sube al repo (${code('screenshots/resumen_latest.png')}), y manda un mail v\u00eda
          <b>Gmail SMTP</b> (cuenta ${code('jarvis.aconcagua@gmail.com')}, App Password en secret ${code('GMAIL_APP_PASSWORD')})
-         a las direcciones configuradas en ${code('TO_EMAILS')}.`,
+         a las direcciones configuradas en ${code('TO_EMAILS')}. El link 'Ver Dashboard Completo' del mail apunta al servidor privado (${code('http://10.203.16.33/ctavav/index.html')}).
+         El mail solo se env\u00eda si el .xls del mes cambi\u00f3 desde el \u00faltimo env\u00edo (comparaci\u00f3n por hash SHA256, guardado en ${code('data/.last_email_state.json')}).`,
       ])}
       Resultado: cada ma\u00f1ana el repo tiene planillas frescas + TC actualizado, y llega un mail con el resumen visual.
     `)}
@@ -1814,10 +1815,12 @@ function buildHowItWorks(){
     `)}
 
     ${sec('9. Publicar cambios al dashboard (publisher.html)', `
-      Cuando se edita ${code('index.html')} (nuevas features, fixes), hay que subir el HTML actualizado al repo. Esto se hace con
-      ${code('publisher.html')}: un archivo separado que contiene el ${code('index.html')} completo embebido como string JSON
-      (${code('HTML_CONTENT')}). Al abrirlo, pide el token de GitHub (mismo que el de Configuraci\u00f3n) y hace un PUT a la API
-      de contenidos de GitHub para sobreescribir ${code('index.html')} en el repo \u2192 GitHub Pages lo re-publica solo.
+      Cuando se edita ${code('index.html')} (nuevas features, fixes), hay que subir el HTML actualizado al repo usando
+      ${code('publisher.html')}: un archivo separado (no visible en el dashboard) que contiene el ${code('index.html')} completo
+      embebido como string JSON. Al abrirlo en el browser, pide un <b>Personal Access Token de GitHub</b> (scope ${code('repo')})
+      y hace un PUT a la API de contenidos de GitHub para sobreescribir ${code('index.html')} en el repo \u2192
+      GitHub Pages re-publica autom\u00e1ticamente. El token se guarda en ${code('localStorage')} del browser (nunca en el c\u00f3digo).
+      Nota: el bot\u00f3n de publicar fue removido del dashboard \u2014 el publisher es un archivo aparte que se abre localmente.
     `)}
 
     ${sec('10. Resumen del flujo completo (de punta a punta)', `
