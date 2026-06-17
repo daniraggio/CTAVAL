@@ -20,6 +20,7 @@ TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "js
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
 DASHBOARD_URL   = "https://daniraggio.github.io/CTAVAL/"
+DASHBOARD_LINK  = "http://10.203.16.33/ctavav/index.html"
 SCREENSHOT_PATH = Path("/tmp/resumen.png")
 IMG_REPO_PATH   = "screenshots/resumen_latest.png"
 IMG_PUBLIC_URL  = f"https://raw.githubusercontent.com/{REPO}/main/{IMG_REPO_PATH}"
@@ -93,7 +94,7 @@ def build_html_email():
       <img src="{img_url}" width="640" style="width:100%;border-radius:6px;display:block" alt="Resumen del mes"/>
     </div>
     <div style="text-align:center;margin:28px 0">
-      <a href="{DASHBOARD_URL}" style="background:#238636;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:14px;display:inline-block">
+      <a href="{DASHBOARD_LINK}" style="background:#238636;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:14px;display:inline-block">
         Ver Dashboard Completo →
       </a>
     </div>
