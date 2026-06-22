@@ -504,12 +504,26 @@ function parseSheet(wb, name) {
   function cellDate(v) {
     if (v == null) return null;
     if (typeof v === 'object' && !(v instanceof Date)) v = v.v;
-    if (v instanceof Date) return dateParts(v);
     if (typeof v === 'number') return xlDateToStr(v);
-    const s = String(v).trim();
-    if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0,10);
-    const d = new Date(s);
-    return isNaN(d) ? null : dateParts(d);
+    // Handle string first — covers ISO strings like "2026-01-01T03:00:00.000Z"
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0,10);
+      const d = new Date(s);
+      if (!isNaN(d)) {
+        // Use UTC components to avoid timezone shift
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+      }
+      return null;
+    }
+    if (v instanceof Date) {
+      // Check if this is an ISO-sourced date (has time component) — use UTC
+      if (v.getHours() !== 0 || v.getMinutes() !== 0) {
+        return `${v.getUTCFullYear()}-${String(v.getUTCMonth()+1).padStart(2,'0')}-${String(v.getUTCDate()).padStart(2,'0')}`;
+      }
+      return dateParts(v);
+    }
+    return null;
   }
 
   const rows = [];
@@ -1074,18 +1088,26 @@ function calcCostoGas(){
   MKEYS.forEach(m=>{
     let total=0;
     const eRows=getRows(EKEYS[m]);
-    const cRows=getRows(COMBKEYS[m]);
-    const tKey=TRANSPKEYS[m]; const tRows=tKey?getRows(tKey):[];
+    const cRowsGX=getRows(COMBKEYS[m]);
+    const cRowsGA=getRows(COMBKEYS_GA[m]);
+    const tRowsGX=getRows(TRANSPKEYS[m]);
+    const tRowsGA=getRows(TRANSPKEYS_GA[m]);
+    const ctRows=getRows(COMBTYPEKEYS[m]);
     eRows.forEach(er=>{
-      const cr=cRows.find(x=>x.fecha===er.fecha);
-      const tr=tRows.find?.(x=>x.fecha===er.fecha);
+      const crGX=cRowsGX.find(x=>x.fecha===er.fecha);
+      const crGA=cRowsGA.find(x=>x.fecha===er.fecha);
+      const trGX=tRowsGX.find?.(x=>x.fecha===er.fecha);
+      const trGA=tRowsGA.find?.(x=>x.fecha===er.fecha);
+      const ctR=ctRows.find?.(x=>x.fecha===er.fecha);
       const eh=er.h||Array(24).fill(er.avg||0);
-      const ch=cr?.h||Array(24).fill(cr?.avg||0);
-      const th=tr?.h||Array(24).fill(tr?.avg||0);
       for(let i=0;i<24;i++){
-        const e=eh[i]||0;
-        const costo=((ch[i]||0)+(th[i]||0))*e;
-        total+=costo;
+        const e=eh[i]||0; if(!e) continue;
+        const isGA=ctR?.h?String(ctR.h[i]||'').trim()==='GA':false;
+        const cr=isGA?crGA:crGX;
+        const tr=isGA?trGA:trGX;
+        const ch=cr?.h||Array(24).fill(cr?.avg||0);
+        const th=tr?.h||Array(24).fill(tr?.avg||0);
+        total+=((ch[i]||0)+(th[i]||0))*e;
       }
     });
     byMaq[m]=total;
@@ -1101,14 +1123,22 @@ function calcCostoGasDaily(){
     let day=0;
     MKEYS.forEach(m=>{
       const er=getRows(EKEYS[m]).find(x=>x.fecha===fecha);
-      const cr=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
-      const tKey=TRANSPKEYS[m];
-      const tr=tKey?getRows(tKey).find(x=>x.fecha===fecha):null;
       if(!er)return;
+      const crGX=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
+      const crGA=getRows(COMBKEYS_GA[m]).find(x=>x.fecha===fecha);
+      const trGX=getRows(TRANSPKEYS[m]).find(x=>x.fecha===fecha);
+      const trGA=getRows(TRANSPKEYS_GA[m]).find(x=>x.fecha===fecha);
+      const ctR=getRows(COMBTYPEKEYS[m]).find(x=>x.fecha===fecha);
       const eh=er.h||Array(24).fill(er.avg||0);
-      const ch=cr?.h||Array(24).fill(cr?.avg||0);
-      const th=tr?.h||Array(24).fill(tr?.avg||0);
-      for(let i=0;i<24;i++) day+=((ch[i]||0)+(th[i]||0))*(eh[i]||0);
+      for(let i=0;i<24;i++){
+        const e=eh[i]||0; if(!e) continue;
+        const isGA=ctR?.h?String(ctR.h[i]||'').trim()==='GA':false;
+        const cr=isGA?crGA:crGX;
+        const tr=isGA?trGA:trGX;
+        const ch=cr?.h||Array(24).fill(cr?.avg||0);
+        const th=tr?.h||Array(24).fill(tr?.avg||0);
+        day+=((ch[i]||0)+(th[i]||0))*e;
+      }
     });
     return{fecha,val:day};
   }).filter(x=>x.val>0);
