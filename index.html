@@ -1084,9 +1084,10 @@ function calcPotMes(){
 
 // Costo Gas = (CVP_Comb_h + CVP_Transp_h) * Energia_h por máquina y hora
 function calcCostoGas(){
-  const byMaq={};
+  // Returns {TOTAL (GX only, matches DTE), TOTAL_GA (gas propio), byMaq}
+  const byMaq={}; const byMaqGA={};
   MKEYS.forEach(m=>{
-    let total=0;
+    let totalGX=0, totalGA=0;
     const eRows=getRows(EKEYS[m]);
     const cRowsGX=getRows(COMBKEYS[m]);
     const cRowsGA=getRows(COMBKEYS_GA[m]);
@@ -1103,17 +1104,23 @@ function calcCostoGas(){
       for(let i=0;i<24;i++){
         const e=eh[i]||0; if(!e) continue;
         const isGA=ctR?.h?String(ctR.h[i]||'').trim()==='GA':false;
-        const cr=isGA?crGA:crGX;
-        const tr=isGA?trGA:trGX;
-        const ch=cr?.h||Array(24).fill(cr?.avg||0);
-        const th=tr?.h||Array(24).fill(tr?.avg||0);
-        total+=((ch[i]||0)+(th[i]||0))*e;
+        if(isGA){
+          const ch=crGA?.h||Array(24).fill(crGA?.avg||0);
+          const th=trGA?.h||Array(24).fill(trGA?.avg||0);
+          totalGA+=((ch[i]||0)+(th[i]||0))*e;
+        } else {
+          const ch=crGX?.h||Array(24).fill(crGX?.avg||0);
+          const th=trGX?.h||Array(24).fill(trGX?.avg||0);
+          totalGX+=((ch[i]||0)+(th[i]||0))*e;
+        }
       }
     });
-    byMaq[m]=total;
+    byMaq[m]=totalGX;
+    byMaqGA[m]=totalGA;
   });
-  byMaq.TOTAL=MKEYS.reduce((s,m)=>s+(byMaq[m]||0),0);
-  return byMaq; // $
+  const TOTAL=MKEYS.reduce((s,m)=>s+(byMaq[m]||0),0);
+  const TOTAL_GA=MKEYS.reduce((s,m)=>s+(byMaqGA[m]||0),0);
+  return {TOTAL, TOTAL_GA, byMaq, byMaqGA};
 }
 
 // Daily costo gas totals for chart
@@ -1373,7 +1380,7 @@ async function buildResumen(){
   const enre=CFG.ENRE;
   const cammesa=0.0004*remGrand;
   const impDebCred=(0.006*(remGrand-enre))+(0.006*(canonAgua+transporte));
-  const totalCostos=costoGas.TOTAL+canonAgua+transporte+enre+cammesa+impDebCred;
+  const totalCostos=costoGas.TOTAL+costoGas.TOTAL_GA+canonAgua+transporte+enre+cammesa+impDebCred;
   const netTotal=remGrand-totalCostos;
 
   const kpiRows=[
@@ -1406,7 +1413,8 @@ async function buildResumen(){
     {label:'RPF',               val:'$ '+fmtFull(remRPF),             unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora'},
     {label:'Total Remuneraciones',val:'$ '+fmtFull(remGrand),         unit:'Energía + Potencia + Conf. + RPF',  b:true},
     {sep:true,label:'Costos'},
-    {label:'Costo Gas',         val:'$ '+fmtFull(costoGas.TOTAL),     unit:'Σ(CVP_CombRem + CVP_TranspProvRem) × E — por hora · 4 máquinas (TG23, TG22, TV11, TV12)'},
+    {label:'Costo Gas (GN Ac.)',   val:'$ '+fmtFull(costoGas.TOTAL),     unit:'Σ(CVP_Comb + CVP_Transp) horas GX × E — coincide con DTE (Descuento GN Ac y tran)'},
+    {label:'Costo Gas Propio (GA)',val:'$ '+fmtFull(costoGas.TOTAL_GA),  unit:'Σ(CVP_Comb + CVP_Transp) horas GA × E — costo del gas propio (no incluido en DTE)', color:'var(--warn)'},
     {label:'Canon del Agua',    val:'$ '+fmtFull(canonAgua),          unit:fmtFull(eMWh.TOTAL)+' MWh × $'+CFG.CANON_AGUA, },
     {label:'Transporte',        val:'$ '+fmtFull(transporte),         unit:'valor fijo configurado',  },
     {label:'ENRE',              val:'$ '+fmtFull(enre),                unit:'valor fijo configurado (default 1.658.007 ÷ 3)'},
@@ -1619,7 +1627,8 @@ function _renderResumenUSD(){
     {label:'RPF',                 val:u+fmtFull(remRPF_usd),                  unit:'PRECIO_RPF × avg(PORC_RPF) × ΣE — por hora'},
     {label:'Total Remuneraciones',val:u+fmtFull(remGrand_usd),                unit:'Energía + Potencia + Conf. + RPF', b:true},
     {sep:true,label:'Costos'},
-    {label:'Costo Gas',           val:u+fmtFull(costoGas_usd),                unit:'Σ(CVP_CombRem + CVP_TranspProvRem) × E — por hora · 4 máquinas (TG23, TG22, TV11, TV12)'},
+    {label:'Costo Gas (GN Ac.)',   val:u+fmtFull(costoGas_usd),                unit:'Σ(CVP_Comb + CVP_Transp) horas GX × E — coincide con DTE'},
+    {label:'Costo Gas Propio (GA)',val:u+fmtFull(toU(costoGas.TOTAL_GA)),          unit:'Σ(CVP_Comb + CVP_Transp) horas GA × E — costo del gas propio (no incluido en DTE)', color:'var(--warn)'},
     {label:'Canon del Agua',      val:u+fmtFull(canonAgua_usd),               unit:fmtFull(eMWh.TOTAL)+' MWh × USD '+fmtN(CFG.CANON_AGUA/tc,2), },
     {label:'Transporte',          val:u+fmtN(transporte_usd,2),               unit:'valor fijo configurado', },
     {label:'ENRE',                val:u+fmtN(enre_usd,2),                     unit:'valor fijo configurado (default 1.658.007 ÷ 3, en USD)'},
@@ -1799,7 +1808,7 @@ function buildHowItWorks(){
       Cada c\u00e1lculo recorre las mismas 4 m\u00e1quinas. Las hojas clave por m\u00e1quina son:
       ${ul([
         `${code('AVALxx-ENERGIA')} \u2014 energ\u00eda generada por hora (MWh). Esta es la <b>base de todo</b>: si una hora tiene energ\u00eda > 0, esa hora "cuenta".`,
-        `${code('AVALxx-CVPCOMBREM-GX')} / ${code('-GA')} \u2014 CVP combustible en \$/MWh. Se usa la hoja <b>-GX</b> en horas declaradas GX y la hoja <b>-GA</b> en horas declaradas GA.`,
+        `${code('AVALxx-CVPCOMBREM-GX')} / ${code('-GA')} \u2014 CVP combustible en \$/MWh. Se usa la hoja <b>-GX</b> en horas GX y la hoja <b>-GA</b> en horas GA. El costo GA se separa del GX porque CAMMESA <b>no lo incluye</b> en el DTE (es costo propio de la central).`,
         `${code('AVALxx-CVPTRANSPREMPROV-GX')} / ${code('-GA')} \u2014 CVP transporte, mismo criterio GX/GA.`,
         `${code('AVALxx-CVPOYMREM-GX')} / ${code('-GA')} \u2014 CVP O&M, mismo criterio GX/GA (las 4 m\u00e1quinas).`,
         `${code('AVALxx-FACTOR_PERDIDAS')} \u2014 factor de p\u00e9rdidas de transporte (FP), multiplica al CMO.`,
@@ -1837,7 +1846,8 @@ function buildHowItWorks(){
         `<b>Potencia remunerada</b> = ${code('\u03a3 POT_DISP')} en esas mismas horas HRP, en MW\u00b7hrp \u2014 valor informativo.`,
         `<b>Confiabilidad</b> = ${code('Potencia del mes (MW) \u00d7 CFG.CONF (USD/MW) \u00d7 TC')}.`,
         `<b>RPF</b> = ${code('\u03a3 PRECIO_RPF_hora \u00d7 promedio(PORC_RPF de las 4 m\u00e1quinas)_hora / 100 \u00d7 \u03a3 Energ\u00eda_hora')}.`,
-        `<b>Costo Gas</b> = ${code('\u03a3 (CVP_Comb + CVP_Transp)_hora \u00d7 Energ\u00eda_hora')}, para las 4 m\u00e1quinas \u2014 es lo que "le cuesta" el gas a la central.`,
+    `<b>Costo Gas (GN Ac.)</b> = ${code('\u03a3 (CVP_Comb + CVP_Transp) horas GX \u00d7 E')}, para las 4 m\u00e1quinas \u2014 coincide con el DTE (\u00edtem "Descuento GN Ac y tran").`,
+        `<b>Costo Gas Propio (GA)</b> = ${code('\u03a3 (CVP_Comb_GA + CVP_Transp_GA) horas GA \u00d7 E')} \u2014 costo del gas propio, <b>no inclu\u00eddo en el DTE</b> pero s\u00ed en el resultado neto.`,
         `<b>Canon del Agua</b> = ${code('Energ\u00eda total (MWh) \u00d7 CFG.CANON_AGUA (\$/MWh)')}.`,
         `<b>CAMMESA</b> = ${code('0.04% \u00d7 Total Remuneraciones')}.`,
         `<b>Imp. D\u00e9bitos/Cr\u00e9ditos</b> = ${code('0.6% \u00d7 (Total Rem. \u2212 ENRE) + 0.6% \u00d7 (Canon + Transporte)')}.`,
