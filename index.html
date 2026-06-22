@@ -442,11 +442,14 @@ const SHEETS_NEEDED = [
   'AVALTG23-EST_REMUN','AVALTG22-EST_REMUN','AVALTV11-EST_REMUN','AVALTV12-EST_REMUN',
   'AVALTG23-ESTREMUN-GA','AVALTG22-ESTREMUN-GA','AVALTV11-ESTREMUN-GA','AVALTV12-ESTREMUN-GA',
   'AVALTG23-CVPCOMBREM-GX','AVALTG22-CVPCOMBREM-GX','AVALTV11-CVPCOMBREM-GX','AVALTV12-CVPCOMBREM-GX',
+  'AVALTG23-CVPCOMBREM-GA','AVALTG22-CVPCOMBREM-GA','AVALTV11-CVPCOMBREM-GA','AVALTV12-CVPCOMBREM-GA',
   'AVALTG23-CVPCOMBDESC-GX','AVALTG22-CVPCOMBDESC-GX','AVALTV11-CVPCOMBDESC-GX','AVALTV12-CVPCOMBDESC-GX',
   'AVALTG23-CVPCOMBDESP-GX','AVALTG22-CVPCOMBDESP-GX','AVALTV11-CVPCOMBDESP-GX','AVALTV12-CVPCOMBDESP-GX',
   'cvp-AVALTG23-COMB','cvp-AVALTG22-COMB','cvp-AVALTV11-COMB','cvp-AVALTV12-COMB',
   'AVALTG22-CVPTRANSPREMPROV-GX','AVALTG23-CVPTRANSPREMPROV-GX','AVALTV11-CVPTRANSPREMPROV-GX','AVALTV12-CVPTRANSPREMPROV-GX',
-  'AVALTG22-CVPOYMREM-GX','AVALTG23-CVPOYMREM-GX','AVALTV11-CVPOYMREM-GX','AVALTV12-CVPOYMREM-GX','PRECIOS-CMO',
+  'AVALTG22-CVPTRANSPREMPROV-GA','AVALTG23-CVPTRANSPREMPROV-GA','AVALTV11-CVPTRANSPREMPROV-GA','AVALTV12-CVPTRANSPREMPROV-GA',
+  'AVALTG22-CVPOYMREM-GX','AVALTG23-CVPOYMREM-GX','AVALTV11-CVPOYMREM-GX','AVALTV12-CVPOYMREM-GX',
+  'AVALTG22-CVPOYMREM-GA','AVALTG23-CVPOYMREM-GA','AVALTV11-CVPOYMREM-GA','AVALTV12-CVPOYMREM-GA','PRECIOS-CMO',
   'AVALTG23-FACTOR_PERDIDAS','AVALTG22-FACTOR_PERDIDAS','AVALTV11-FACTOR_PERDIDAS','AVALTV12-FACTOR_PERDIDAS',
   'AVALTG23-PRECIO_NODO','AVALTG22-PRECIO_NODO','AVALTV11-PRECIO_NODO','AVALTV12-PRECIO_NODO',
   'AVALTG23-POT_DISP','AVALTG22-POT_DISP','AVALTV11-POT_DISP','AVALTV12-POT_DISP',
@@ -956,14 +959,17 @@ function cvpAccum(priceKey,energyKey){
 // ── MACHINE KEYS ─────────────────────────────────────────────────────────
 const MKEYS=['TG23','TG22','TV11','TV12'];
 const EKEYS={TG23:'AVALTG23-ENERGIA',TG22:'AVALTG22-ENERGIA',TV11:'AVALTV11-ENERGIA',TV12:'AVALTV12-ENERGIA'};
-const COMBKEYS={TG23:'AVALTG23-CVPCOMBREM-GX',TG22:'AVALTG22-CVPCOMBREM-GX',TV11:'AVALTV11-CVPCOMBREM-GX',TV12:'AVALTV12-CVPCOMBREM-GX'};
+const COMBKEYS   ={TG23:'AVALTG23-CVPCOMBREM-GX',TG22:'AVALTG22-CVPCOMBREM-GX',TV11:'AVALTV11-CVPCOMBREM-GX',TV12:'AVALTV12-CVPCOMBREM-GX'};
+const COMBKEYS_GA={TG23:'AVALTG23-CVPCOMBREM-GA',TG22:'AVALTG22-CVPCOMBREM-GA',TV11:'AVALTV11-CVPCOMBREM-GA',TV12:'AVALTV12-CVPCOMBREM-GA'};
 const COMBTYPEKEYS={TG23:'cvp-AVALTG23-COMB',TG22:'cvp-AVALTG22-COMB',TV11:'cvp-AVALTV11-COMB',TV12:'cvp-AVALTV12-COMB'};
 const DESCKEYS={TG23:'AVALTG23-CVPCOMBDESC-GX',TG22:'AVALTG22-CVPCOMBDESC-GX',TV11:'AVALTV11-CVPCOMBDESC-GX',TV12:'AVALTV12-CVPCOMBDESC-GX'};
 const DESPKEYS={TG23:'AVALTG23-CVPCOMBDESP-GX',TG22:'AVALTG22-CVPCOMBDESP-GX',TV11:'AVALTV11-CVPCOMBDESP-GX',TV12:'AVALTV12-CVPCOMBDESP-GX'};
 const ESTKEYS={TG23:'AVALTG23-EST_REMUN',TG22:'AVALTG22-EST_REMUN',TV11:'AVALTV11-EST_REMUN',TV12:'AVALTV12-EST_REMUN'};
 const ESTKEYS_GA={TG23:'AVALTG23-ESTREMUN-GA',TG22:'AVALTG22-ESTREMUN-GA',TV11:'AVALTV11-ESTREMUN-GA',TV12:'AVALTV12-ESTREMUN-GA'};
-const TRANSPKEYS={TG22:'AVALTG22-CVPTRANSPREMPROV-GX',TG23:'AVALTG23-CVPTRANSPREMPROV-GX',TV11:'AVALTV11-CVPTRANSPREMPROV-GX',TV12:'AVALTV12-CVPTRANSPREMPROV-GX'};
-const OYMKEYS={TG23:'AVALTG23-CVPOYMREM-GX',TG22:'AVALTG22-CVPOYMREM-GX',TV11:'AVALTV11-CVPOYMREM-GX',TV12:'AVALTV12-CVPOYMREM-GX'};
+const TRANSPKEYS   ={TG22:'AVALTG22-CVPTRANSPREMPROV-GX',TG23:'AVALTG23-CVPTRANSPREMPROV-GX',TV11:'AVALTV11-CVPTRANSPREMPROV-GX',TV12:'AVALTV12-CVPTRANSPREMPROV-GX'};
+const TRANSPKEYS_GA={TG22:'AVALTG22-CVPTRANSPREMPROV-GA',TG23:'AVALTG23-CVPTRANSPREMPROV-GA',TV11:'AVALTV11-CVPTRANSPREMPROV-GA',TV12:'AVALTV12-CVPTRANSPREMPROV-GA'};
+const OYMKEYS   ={TG23:'AVALTG23-CVPOYMREM-GX',TG22:'AVALTG22-CVPOYMREM-GX',TV11:'AVALTV11-CVPOYMREM-GX',TV12:'AVALTV12-CVPOYMREM-GX'};
+const OYMKEYS_GA={TG23:'AVALTG23-CVPOYMREM-GA',TG22:'AVALTG22-CVPOYMREM-GA',TV11:'AVALTV11-CVPOYMREM-GA',TV12:'AVALTV12-CVPOYMREM-GA'};
 const FPKEYS={TG23:'AVALTG23-FACTOR_PERDIDAS',TG22:'AVALTG22-FACTOR_PERDIDAS',TV11:'AVALTV11-FACTOR_PERDIDAS',TV12:'AVALTV12-FACTOR_PERDIDAS'};
 const POTKEYS={TG23:'AVALTG23-POT_DISP',TG22:'AVALTG22-POT_DISP',TV11:'AVALTV11-POT_DISP',TV12:'AVALTV12-POT_DISP'};
 
@@ -1164,11 +1170,18 @@ function calcRemHour(m,fecha,h){
   const eRow=getRows(EKEYS[m]).find(x=>x.fecha===fecha);
   const e=(eRow?.h?eRow.h[h]:eRow?.avg)||0;
   if(!e||e<=0)return null;
-  const comb=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
+  // FRC and sheet selection: GA=gas propio (FRC=1, planilla -GA), GX=gas acuerdo (FRC=0.8, planilla -GX)
+  const tipoRow=getRows(COMBTYPEKEYS[m]).find(x=>x.fecha===fecha);
+  const tipo=tipoRow?.h?String(tipoRow.h[h]||'').trim():'';
+  const isGA=(tipo==='GA');
+  const combKey  =isGA?COMBKEYS_GA[m]  :COMBKEYS[m];
+  const transpKey=isGA?TRANSPKEYS_GA[m]:TRANSPKEYS[m];
+  const oymKey   =isGA?OYMKEYS_GA[m]   :OYMKEYS[m];
+  const comb=getRows(combKey).find(x=>x.fecha===fecha);
   const combV=comb?.h?comb.h[h]??comb.avg:comb?.avg??0;
-  const transpKey=TRANSPKEYS[m];let transpV=0;
+  let transpV=0;
   if(transpKey){const tr=getRows(transpKey).find(x=>x.fecha===fecha);transpV=tr?.h?tr.h[h]??tr.avg:tr?.avg??0;}
-  const oymKey=OYMKEYS[m];let oymV=0;
+  let oymV=0;
   if(oymKey){const oy=getRows(oymKey).find(x=>x.fecha===fecha);oymV=oy?.h?oy.h[h]??oy.avg:oy?.avg??0;}
   const cvpTotal=(combV||0)+(transpV||0)+(oymV||0);
   const cmoRow=getRows('PRECIOS-CMO').find(x=>x.fecha===fecha);
@@ -1179,7 +1192,7 @@ function calcRemHour(m,fecha,h){
   const tc_rmin=getTC();const cvpUSD=tc_rmin>0?cvpTotal/tc_rmin:0;
   const RMIN_USD=cvpUSD<CFG.RMIN_THR?CFG.RMIN_LO:CFG.RMIN_HI;
   const RMIN=RMIN_USD*tc_rmin;  // convert RMIN to ARS for comparison with diff×FRA
-  const FRC=getFRC(m,fecha,h);
+  const FRC=isGA?1:0.8;
   const diff=Math.max(0,cmoFP-cvpTotal);
   // Check operational state: if COP, only CVP is remunerated (no renta margin)
   const estRow=getRows(ESTKEYS[m]).find(x=>x.fecha===fecha);
@@ -1756,9 +1769,9 @@ function buildHowItWorks(){
       Cada c\u00e1lculo recorre las mismas 4 m\u00e1quinas. Las hojas clave por m\u00e1quina son:
       ${ul([
         `${code('AVALxx-ENERGIA')} \u2014 energ\u00eda generada por hora (MWh). Esta es la <b>base de todo</b>: si una hora tiene energ\u00eda > 0, esa hora "cuenta".`,
-        `${code('AVALxx-CVPCOMBREM-GX')} \u2014 costo variable de producci\u00f3n por <b>combustible</b>, en \$/MWh, por hora.`,
-        `${code('AVALxx-CVPTRANSPREMPROV-GX')} \u2014 CVP de <b>transporte de combustible</b> (solo existe para TG22/TG23).`,
-        `${code('AVALxx-CVPOYMREM-GX')} \u2014 CVP de <b>operaci\u00f3n y mantenimiento (O&M)</b>, \$/MWh (las 4 m\u00e1quinas).`,
+        `${code('AVALxx-CVPCOMBREM-GX')} / ${code('-GA')} \u2014 CVP combustible en \$/MWh. Se usa la hoja <b>-GX</b> en horas declaradas GX y la hoja <b>-GA</b> en horas declaradas GA.`,
+        `${code('AVALxx-CVPTRANSPREMPROV-GX')} / ${code('-GA')} \u2014 CVP transporte, mismo criterio GX/GA.`,
+        `${code('AVALxx-CVPOYMREM-GX')} / ${code('-GA')} \u2014 CVP O&M, mismo criterio GX/GA (las 4 m\u00e1quinas).`,
         `${code('AVALxx-FACTOR_PERDIDAS')} \u2014 factor de p\u00e9rdidas de transporte (FP), multiplica al CMO.`,
         `${code('AVALxx-EST_REMUN')} \u2014 estado operativo por hora (texto): ${code('===')}, ${code('COP')}, ${code('Arr')}, ${code('i-i')}, ${code('lib')}.`,
         `${code('AVALxx-ESTREMUN-GA')} \u2014 horas declaradas con generaci\u00f3n "GA" (gas propio) para el cartel de "Producci\u00f3n con gas propio".`,
@@ -1777,12 +1790,14 @@ function buildHowItWorks(){
         CMO_FP = CMO \u00d7 FP<br>
         RMIN_USD = 2 si (CVP_TOTAL / TC) &lt; 60, sino 7 &nbsp;\u2192&nbsp; RMIN = RMIN_USD \u00d7 TC<br>
         diff = MAX(0, CMO_FP \u2212 CVP_TOTAL)<br>
-        FRC = 1 si la hora est\u00e1 declarada <b>GA</b> (gas propio), 0.8 si <b>GX</b> (gas de acuerdo)<br>
+        Planilla CVP = <b>-GA</b> si hora declarada GA, <b>-GX</b> si declarada GX (Comb + Transp + O&M)<br>
+        FRC = 1 si GA, 0.8 si GX<br>
         <b>REM = CVP_TOTAL + MAX(RMIN, diff \u00d7 FRA \u00d7 FRC)</b> &nbsp;&nbsp; (FRA = ${code('CFG.FRA')}, default 0.15)<br>
         <span style="color:var(--warn)">Excepci\u00f3n: si el estado de la hora es COP \u2192 REM = CVP_TOTAL (sin renta adicional)</span>
       </div>
-      El total mensual ${code('Rem. Energ\u00eda')} es ${code('\u03a3 (REM_hora \u00d7 E_hora)')} para las 1-4 m\u00e1quinas y todas las horas del mes
-      con generaci\u00f3n. <b>FRC se lee hora a hora</b> desde ${code('cvp-AVALxx-COMB')} \u2014 no es un valor manual configurado.
+      El total mensual ${code('Rem. Energ\u00eda')} es ${code('\u03a3 (REM_hora \u00d7 E_hora)')} para las 4 m\u00e1quinas y todas las horas del mes
+      con generaci\u00f3n. La declaraci\u00f3n GA/GX se lee hora a hora desde ${code('cvp-AVALxx-COMB')} \u2014
+      determina tanto el FRC como qu\u00e9 planilla de CVP usar (${code('-GA')} o ${code('-GX')}).
     `)}
 
     ${sec('7. El resto de las remuneraciones y los costos', `
