@@ -123,7 +123,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
     <div class="nav-group">
       <div class="nav-label">Energía</div>
       <button class="ni" onclick="showSec('energia')"><span class="nd"></span>Energía MWh</button>
-      <button class="ni" onclick="showSec('cmo')"><span class="nd"></span>CMO $/MWh</button>
+      <button class="ni" onclick="showSec('cmo')"><span class="nd"></span>CMO</button>
     </div>
     <div class="nav-group">
       <div class="nav-label">Costos CVP</div>
@@ -228,6 +228,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
     <div class="card">
       <div class="card-hdr"><div><div class="card-title">CMO diario completo</div><div class="card-sub">$/MWh</div></div></div>
       <div class="cw" style="height:300px"><canvas id="cCmoFull" role="img" aria-label="CMO diario"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <div class="card-hdr"><div><div class="card-title">CMO diario completo</div><div class="card-sub">USD/MWh</div></div></div>
+      <div class="cw" style="height:300px"><canvas id="cCmoUSD" role="img" aria-label="CMO diario USD"></canvas></div>
     </div>
   </div>
 
@@ -1585,7 +1589,7 @@ function _renderResumenUSD(){
 
   const remConf=potMes*CFG.CONF;                          // USD
   const remRPF_usd=toU(calcRPF());                        // USD
-  const costoGas_usd=toU(calcCostoGas().TOTAL);           // USD
+  const costoGas=calcCostoGas(); const costoGas_usd=toU(costoGas.TOTAL);  // USD
 
   const remGrand_usd=toU(remE.TOTAL)+remP.TOTAL+remConf+remRPF_usd;
 
@@ -1594,7 +1598,7 @@ function _renderResumenUSD(){
   const enre_usd=toU(CFG.ENRE);
   const cammesa_usd=0.0004*remGrand_usd;
   const impDebCred_usd=(0.006*(remGrand_usd-enre_usd))+(0.006*(canonAgua_usd+transporte_usd));
-  const totalCostos_usd=costoGas_usd+canonAgua_usd+transporte_usd+enre_usd+cammesa_usd+impDebCred_usd;
+  const totalCostos_usd=costoGas_usd+toU(costoGas.TOTAL_GA)+canonAgua_usd+transporte_usd+enre_usd+cammesa_usd+impDebCred_usd;
   const net_usd=remGrand_usd-totalCostos_usd;
 
   const u='USD ';
@@ -1939,11 +1943,17 @@ function buildCmo(){
   const avgs=rows.map(r=>r.avg),mn=Math.min(...avgs),mx=Math.max(...avgs);
   const last=avgs[avgs.length-1],prev=avgs.length>1?avgs[avgs.length-2]:last;
   const delta=((last-prev)/prev*100).toFixed(1),up=last>=prev;
+  const avg=avgs.reduce((a,b)=>a+b,0)/avgs.length;
+  const tc=getTC();
   document.getElementById('kpi-cmo').innerHTML=`
     <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtK(last)}</div><div class="kpi-unit">$/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
     <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtK(mn)}</div><div class="kpi-unit">$/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val a">${fmtK(avg)}</div><div class="kpi-unit">$/MWh</div></div>
     <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtK(mx)}</div><div class="kpi-unit">$/MWh</div></div>`;
   mkChart('cCmoFull',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO $/MWh',data:avgs,borderColor:'#fbbf24',backgroundColor:'#fbbf2415',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+  const avgsUSD=tc?avgs.map(v=>v/tc):avgs;
+  const fmtU=v=>fmtN(v/1000,2)+'K';
+  mkChart('cCmoUSD',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO USD/MWh',data:avgsUSD,borderColor:'#34d399',backgroundColor:'#34d39915',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>fmtN(v,0)+' USD'}}}}}});
 }
 
 // ── GENERIC CVP ────────────────────────────────────────────────────────────
