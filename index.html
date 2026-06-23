@@ -1945,11 +1945,13 @@ function buildCmo(){
   const delta=((last-prev)/prev*100).toFixed(1),up=last>=prev;
   const avg=avgs.reduce((a,b)=>a+b,0)/avgs.length;
   const tc=getTC();
+  const toU=v=>tc?v/tc:0;
+  const fmtU=v=>fmtN(v,1)+' USD';
   document.getElementById('kpi-cmo').innerHTML=`
-    <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtK(last)}</div><div class="kpi-unit">$/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
-    <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtK(mn)}</div><div class="kpi-unit">$/MWh</div></div>
-    <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val a">${fmtK(avg)}</div><div class="kpi-unit">$/MWh</div></div>
-    <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtK(mx)}</div><div class="kpi-unit">$/MWh</div></div>`;
+    <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtK(last)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(last))}/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
+    <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtK(mn)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(mn))}/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val a">${fmtK(avg)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(avg))}/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtK(mx)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(mx))}/MWh</div></div>`;
   mkChart('cCmoFull',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO $/MWh',data:avgs,borderColor:'#fbbf24',backgroundColor:'#fbbf2415',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
   const avgsUSD=tc?avgs.map(v=>v/tc):avgs;
   const fmtU=v=>fmtN(v/1000,2)+'K';
