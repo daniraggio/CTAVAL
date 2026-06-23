@@ -229,6 +229,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="card-hdr"><div><div class="card-title">CMO diario completo</div><div class="card-sub">$/MWh</div></div></div>
       <div class="cw" style="height:300px"><canvas id="cCmoFull" role="img" aria-label="CMO diario"></canvas></div>
     </div>
+    <div class="kr" id="kpi-cmo-usd"></div>
     <div class="card" style="margin-top:18px">
       <div class="card-hdr"><div><div class="card-title">CMO diario completo</div><div class="card-sub">USD/MWh</div></div></div>
       <div class="cw" style="height:300px"><canvas id="cCmoUSD" role="img" aria-label="CMO diario USD"></canvas></div>
@@ -1948,10 +1949,17 @@ function buildCmo(){
   const toU=v=>tc?v/tc:0;
   const fmtU=v=>fmtN(v,1)+' USD';
   document.getElementById('kpi-cmo').innerHTML=`
-    <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtK(last)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(last))}/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
-    <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtK(mn)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(mn))}/MWh</div></div>
-    <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val a">${fmtK(avg)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(avg))}/MWh</div></div>
-    <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtK(mx)}</div><div class="kpi-unit">$/MWh · ${fmtU(toU(mx))}/MWh</div></div>`;
+    <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtK(last)}</div><div class="kpi-unit">$/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
+    <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtK(mn)}</div><div class="kpi-unit">$/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val a">${fmtK(avg)}</div><div class="kpi-unit">$/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtK(mx)}</div><div class="kpi-unit">$/MWh</div></div>`;
+  // USD KPI block
+  const kpiUsdEl=document.getElementById('kpi-cmo-usd');
+  if(kpiUsdEl) kpiUsdEl.innerHTML=`
+    <div class="kpi"><div class="kpi-lbl">Último CMO</div><div class="kpi-val w">${fmtN(toU(last),1)}</div><div class="kpi-unit">USD/MWh <span class="${up?'up':'dn'}">${up?'▲':'▼'}${Math.abs(delta)}%</span></div></div>
+    <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtN(toU(mn),1)}</div><div class="kpi-unit">USD/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val a">${fmtN(toU(avg),1)}</div><div class="kpi-unit">USD/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtN(toU(mx),1)}</div><div class="kpi-unit">USD/MWh</div></div>`;
   mkChart('cCmoFull',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO $/MWh',data:avgs,borderColor:'#fbbf24',backgroundColor:'#fbbf2415',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
   const avgsUSD=tc?avgs.map(v=>v/tc):avgs;
   mkChart('cCmoUSD',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO USD/MWh',data:avgsUSD,borderColor:'#34d399',backgroundColor:'#34d39915',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>fmtN(v,0)+' USD'}}}}});
