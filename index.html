@@ -127,6 +127,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
     </div>
     <div class="nav-group">
       <div class="nav-label">Costos CVP</div>
+      <button class="ni" onclick="showSec('cvpTotal')"><span class="nd"></span>CVP Total</button>
       <button class="ni" onclick="showSec('combrem')"><span class="nd"></span>CVP Comb. Rem.</button>
       <button class="ni" onclick="showSec('transpprov')"><span class="nd"></span>CVP Transp. Prov.</button>
       <button class="ni" onclick="showSec('oym')"><span class="nd"></span>CVP O&amp;M Rem.</button>
@@ -237,6 +238,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
   </div>
 
   <!-- CVP COMBREM -->
+  <div class="sec" id="sec-cvpTotal">
+    <div class="kr" id="kpi-cvpTotal"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title" id="cvpTotalTitle">CVP Total</div><div class="card-sub">$/MWh</div></div></div>
+      <div class="cw"><canvas id="cCvpTotal" role="img" aria-label="CVP Total"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:18px;overflow-x:auto">
+      <table class="tbl"><tbody id="tbl-cvpTotal-dbg"></tbody></table>
+    </div>
+  </div>
   <div class="sec" id="sec-combrem">
     <div class="kr" id="kpi-combrem"></div>
     <div class="tabs" id="tabs-combrem"></div>
@@ -1291,6 +1302,7 @@ const SMETA={
   howitworks:{title:'Cómo funciona este dashboard',sub:'Guía técnica completa — arquitectura, datos y fórmulas'},
   energia:{title:'Energía asignada',sub:'MWh por activo'},
   cmo:{title:'CMO — Costo Marginal Operado',sub:'$/MWh'},
+  cvpTotal:{title:'CVP Total',sub:'Comb + Transp + O&M — $/MWh por hora'},
   combrem:{title:'CVP Costo Combustible Rem.',sub:'$/MWh'},
   transpprov:{title:'CVP Transporte Combustible Provisto',sub:'$/MWh'},
   oym:{title:'CVP O&M Remuneración',sub:'$/MWh'},
@@ -1317,7 +1329,7 @@ function buildSection(id){
   // resumen/resumenUSD are async — never cache them, always rebuild
   const noCache=['resumen','resumenUSD'];
   if(!noCache.includes(id)){if(built.has(id))return;built.add(id);}
-  ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),howitworks:buildHowItWorks,energia:buildEnergia,cmo:buildCmo,
+  ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),howitworks:buildHowItWorks,energia:buildEnergia,cmo:buildCmo,cvpTotal:buildCvpTotal,
     combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,estoperativo:buildEstOperativo,
     costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,rentamarginal:buildRentaMarginal,
     heatmap:buildHeatmap,config:buildConfig})[id]?.();
@@ -1996,14 +2008,86 @@ function buildCvpSection(secId,keys,labels,chartId,titleId,tblDbgId,tabsId){
   render(0);
 }
 function buildDbgTable(tblId,sheetKey){
-  const rows=getRows(sheetKey);if(!rows.length){document.getElementById(tblId).innerHTML='';return;}
-  let html=`<thead><tr><th>Fecha</th>${Array.from({length:24},(_,i)=>`<th>${i+1}</th>`).join('')}<th>avg</th></tr></thead><tbody>`;
-  rows.forEach(r=>{
-    html+=`<tr><td class="rl">${fmtDate(r.fecha)}</td>`;
-    (r.h||Array(24).fill(r.avg)).forEach(v=>{html+=`<td title="${v!=null?fmtN(v,0):''}" style="${v&&v>0?'background:rgba(79,142,247,0.15)':''}">${v&&v>0?fmtK(v):''}</td>`;});
-    html+=`<td style="color:var(--accent)">${fmtK(r.avg)}</td></tr>`;
+  const rows=getRows(sheetKey);
+  // Build full month dates
+  const [_y,_m]=MONTH.split('_').map(Number);
+  const _lastDay=new Date(_y,_m,0).getDate();
+  const monthDates=Array.from({length:_lastDay},(_,i)=>{
+    const d=i+1; return `${_y}-${String(_m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  });
+  let html=`<thead><tr><th>Fecha</th>${Array.from({length:24},(_,i)=>`<th class="num">${i+1}</th>`).join('')}<th class="num">Prom</th></tr></thead><tbody>`;
+  monthDates.forEach(fecha=>{
+    const r=rows.find(x=>x.fecha===fecha);
+    html+=`<tr><td class="rl">${fmtDate(fecha)}</td>`;
+    if(r){
+      (r.h||Array(24).fill(r.avg)).forEach(v=>{html+=`<td class="num" title="${v!=null?fmtN(v,0):''}" style="${v&&v>0?'background:rgba(79,142,247,0.12)':''}">${v&&v>0?fmtK(v):''}</td>`;});
+      html+=`<td class="num" style="color:var(--accent)">${fmtK(r.avg)}</td>`;
+    } else {
+      html+=Array(25).fill('<td class="num" style="color:var(--border2)">—</td>').join('');
+    }
+    html+='</tr>';
   });
   document.getElementById(tblId).innerHTML=html+'</tbody>';
+}
+function buildCvpTotal(){
+  const {cvp}=getComputedTotals();
+  const totalMes=cvp.combTotal+cvp.transpTotal+cvp.oymTotal;
+  document.getElementById('kpi-cvpTotal').innerHTML=MKEYS.map((m,i)=>{
+    const t=(cvp['comb'+m]||0)+(cvp['transp'+m]||0)+(cvp['oym'+m]||0);
+    return `<div class="kpi"><div class="kpi-lbl">${m} CVP Total</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(t)}</div><div class="kpi-unit">$ mes</div></div>`;
+  }).join('')+
+  `<div class="kpi" style="border-color:rgba(79,142,247,.35)"><div class="kpi-lbl">TOTAL MES</div><div class="kpi-val a">${fmtK(totalMes)}</div><div class="kpi-unit">$ mes</div></div>`;
+
+  // Build per-machine CVP total rows for table
+  const [_y,_m]=MONTH.split('_').map(Number);
+  const _lastDay=new Date(_y,_m,0).getDate();
+  const monthDates=Array.from({length:_lastDay},(_,i)=>{
+    const d=i+1; return `${_y}-${String(_m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  });
+
+  // Chart: daily avg CVP total per machine
+  const ds=MKEYS.map((m,i)=>({
+    label:m,
+    data:monthDates.map(d=>{
+      const c=getRows(COMBKEYS[m]).find(x=>x.fecha===d);
+      const t=getRows(TRANSPKEYS[m]).find(x=>x.fecha===d);
+      const o=getRows(OYMKEYS[m]).find(x=>x.fecha===d);
+      return (c?.avg||0)+(t?.avg||0)+(o?.avg||0);
+    }),
+    borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5
+  }));
+  mkChart('cCvpTotal',{type:'line',data:{labels:monthDates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
+
+  // Table: daily CVP total per machine + total
+  const hdrs=HOURS.map(h=>`<th class="num">${h+1}</th>`).join('');
+  let tblHtml=`<thead><tr><th>Fecha</th><th>Máquina</th>${hdrs}<th class="num">Prom</th></tr></thead><tbody>`;
+  monthDates.forEach(fecha=>{
+    MKEYS.forEach((m,mi)=>{
+      const c=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
+      const t=getRows(TRANSPKEYS[m]).find(x=>x.fecha===fecha);
+      const o=getRows(OYMKEYS[m]).find(x=>x.fecha===fecha);
+      const hasData=c||t||o;
+      const ch=c?.h||Array(24).fill(c?.avg||0);
+      const th2=t?.h||Array(24).fill(t?.avg||0);
+      const oh=o?.h||Array(24).fill(o?.avg||0);
+      const tots=Array.from({length:24},(_,i)=>(ch[i]||0)+(th2[i]||0)+(oh[i]||0));
+      const avg=tots.reduce((a,b)=>a+b,0)/24;
+      tblHtml+=`<tr style="${mi===0?'border-top:1px solid var(--border2)':''}">
+        ${mi===0?`<td class="rl" rowspan="4" style="vertical-align:middle">${fmtDate(fecha)}</td>`:''}
+        <td style="font-size:11px;color:${CL[mi]};padding:3px 8px;font-weight:600">${m}</td>`;
+      if(hasData){
+        tots.forEach(v=>{ tblHtml+=`<td class="num" style="font-size:10px;${v>0?'background:rgba(79,142,247,0.1)':''}">${v>0?fmtK(v):''}</td>`; });
+        tblHtml+=`<td class="num" style="color:var(--accent);font-size:11px">${fmtK(avg)}</td>`;
+      } else {
+        tblHtml+=Array(25).fill(`<td class="num" style="color:var(--border2);font-size:10px">—</td>`).join('');
+      }
+      tblHtml+='</tr>';
+    });
+  });
+  document.getElementById('tbl-cvpTotal-dbg').innerHTML=tblHtml+'</tbody>';
+  // Tabs just show "Todos" for now
+  document.getElementById('tabs-cvpTotal').innerHTML='';
+  document.getElementById('cvpTotalTitle').textContent='CVP Total — Comb + Transp + O&M';
 }
 function buildCombrem(){
   const {cvp}=getComputedTotals();
@@ -2720,11 +2804,65 @@ function buildEstOperativo(){
     </div>`;
   }).join('');
 
+  // ── Hourly state table per machine ──
+  const [_y2,_m2]=MONTH.split('_').map(Number);
+  const _lastDay2=new Date(_y2,_m2,0).getDate();
+  const monthDates2=Array.from({length:_lastDay2},(_,i)=>{
+    const d=i+1; return `${_y2}-${String(_m2).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  });
+
+  const STATE_COLORS={
+    '===':'var(--success)','COP':'var(--warn)','COE':'#f97316','lib':'var(--border2)',
+    'i-i':'var(--danger)','Arr':'#a855f7','GEN':'#6366f1','CMB':'#0ea5e9',
+  };
+  const STATE_BG={
+    '===':'rgba(34,197,94,0.15)','COP':'rgba(245,158,11,0.15)','COE':'rgba(249,115,22,0.15)',
+    'lib':'','i-i':'rgba(239,68,68,0.12)','Arr':'rgba(168,85,247,0.15)',
+    'GEN':'rgba(99,102,241,0.15)','CMB':'rgba(14,165,233,0.15)',
+  };
+
+  let hourlyHtml=`<div style="margin-top:28px;border-top:1px solid var(--border);padding-top:20px">
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px">Estado hora a hora — todas las máquinas</div>`;
+
+  MKEYS.forEach(m=>{
+    const estRows=getRows(ESTKEYS[m]);
+    hourlyHtml+=`<div style="margin-bottom:20px">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">${m}</div>
+      <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;min-width:900px">
+        <thead><tr>
+          <th style="padding:3px 8px;color:var(--muted);text-align:left;white-space:nowrap">Fecha</th>
+          ${Array.from({length:24},(_,i)=>`<th style="padding:3px 4px;color:var(--muted);text-align:center;min-width:26px">${i+1}</th>`).join('')}
+        </tr></thead><tbody>`;
+
+    monthDates2.forEach(fecha=>{
+      const r=estRows.find(x=>x.fecha===fecha);
+      const hrs=r?.h||Array(24).fill(r?'===':null);
+      // Only show row if machine has any activity (not all null/lib)
+      const hasActivity=hrs.some(v=>v&&v!=='lib'&&v!==null);
+      if(!hasActivity) return; // skip fully-lib days
+      hourlyHtml+=`<tr>
+        <td style="padding:3px 8px;color:var(--muted);white-space:nowrap;font-size:10px">${fmtDate(fecha)}</td>`;
+      hrs.forEach(v=>{
+        const s=String(v||'lib').trim();
+        const bg=STATE_BG[s]||'rgba(100,100,100,0.1)';
+        const col=STATE_COLORS[s]||'var(--muted)';
+        const label=s==='lib'?'':s==='==='?'OK':s;
+        hourlyHtml+=`<td title="${s}" style="padding:2px 3px;text-align:center;background:${bg};border:1px solid var(--border2)">
+          <span style="font-size:9px;font-weight:600;color:${col}">${label}</span>
+        </td>`;
+      });
+      hourlyHtml+='</tr>';
+    });
+    hourlyHtml+='</tbody></table></div></div>';
+  });
+  hourlyHtml+='</div>';
+
   cont.innerHTML=`
     ${summaryHtml}
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px">
       ${detailHtml}
-    </div>`;
+    </div>
+    ${hourlyHtml}`;
 }
 
 // ── INIT ────────────────────────────────────────────────────────────────────
