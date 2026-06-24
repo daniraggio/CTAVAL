@@ -169,6 +169,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Producción con gas propio</div>
         <div id="tbl-resumen-ga" style="display:inline-block"></div>
       </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Ciclo combinado</div>
+        <div id="tbl-resumen-cc" style="display:inline-block"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Ciclo abierto (solo TG)</div>
+        <div id="tbl-resumen-ca" style="display:inline-block"></div>
+      </div>
     </div>
     <div class="card" style="margin-bottom:18px">
       <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — acumulado diario</div></div></div>
@@ -192,6 +200,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Producción con gas propio</div>
         <div id="tbl-resumenUSD-ga" style="display:inline-block"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Ciclo combinado</div>
+        <div id="tbl-resumenUSD-cc" style="display:inline-block"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Ciclo abierto (solo TG)</div>
+        <div id="tbl-resumenUSD-ca" style="display:inline-block"></div>
       </div>
     </div>
     <div class="card" style="margin-bottom:18px">
@@ -1550,6 +1566,24 @@ async function buildResumen(){
     ? `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--warn)">${gaTotal} h</span><span style="font-size:11px;color:var(--muted);margin-left:8px">${MKEYS.filter(m=>gaH[m]>0).map(m=>m+': '+gaH[m]+'h').join(' | ')}</span>`
     : `<span style="font-size:13px;color:var(--muted)">Sin gas propio</span>`;
   document.getElementById('tbl-resumen-ga').innerHTML=gaLabel;
+
+  // Ciclo combinado: horas donde TV11 o TV12 generaron (TV = solo existe en CC)
+  // Ciclo abierto: horas donde TG23 o TG22 generaron SIN que su TV partner generara
+  let eMWh_CC=0, eMWh_CA=0;
+  allDates(Object.values(EKEYS)).forEach(fecha=>{
+    for(let h=0;h<24;h++){
+      const e23=(getRows(EKEYS['TG23']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      const e22=(getRows(EKEYS['TG22']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      const e11=(getRows(EKEYS['TV11']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      const e12=(getRows(EKEYS['TV12']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      // CC23: TG23+TV11 when TV11>0; CC22: TG22+TV12 when TV12>0
+      if(e11>0){ eMWh_CC+=e23+e11; } else if(e23>0){ eMWh_CA+=e23; }
+      if(e12>0){ eMWh_CC+=e22+e12; } else if(e22>0){ eMWh_CA+=e22; }
+    }
+  });
+  const fmtMWh=v=>v>0?`<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--teal)">${Math.round(v).toLocaleString('es-AR')}</span><span style="font-size:11px;color:var(--muted);margin-left:4px">MWh</span>`:'<span style="font-size:13px;color:var(--muted)">Sin datos</span>';
+  document.getElementById('tbl-resumen-cc').innerHTML=fmtMWh(eMWh_CC);
+  document.getElementById('tbl-resumen-ca').innerHTML=fmtMWh(eMWh_CA);
   _buildResumenCharts('cEnergiaRes',null,null);
 }
 
@@ -1746,6 +1780,24 @@ function _renderResumenUSD(){
     : `<span style="font-size:13px;color:var(--muted)">Sin gas propio</span>`;
   const gaElUSD=document.getElementById('tbl-resumenUSD-ga');
   if(gaElUSD) gaElUSD.innerHTML=gaLabel;
+
+  // CC/CA for USD section (same calc)
+  let eMWh_CC2=0, eMWh_CA2=0;
+  allDates(Object.values(EKEYS)).forEach(fecha=>{
+    for(let h=0;h<24;h++){
+      const e23=(getRows(EKEYS['TG23']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      const e22=(getRows(EKEYS['TG22']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      const e11=(getRows(EKEYS['TV11']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      const e12=(getRows(EKEYS['TV12']).find(x=>x.fecha===fecha)?.h||[])[h]||0;
+      if(e11>0){ eMWh_CC2+=e23+e11; } else if(e23>0){ eMWh_CA2+=e23; }
+      if(e12>0){ eMWh_CC2+=e22+e12; } else if(e22>0){ eMWh_CA2+=e22; }
+    }
+  });
+  const fmtMWh2=v=>v>0?`<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--teal)">${Math.round(v).toLocaleString('es-AR')}</span><span style="font-size:11px;color:var(--muted);margin-left:4px">MWh</span>`:'<span style="font-size:13px;color:var(--muted)">Sin datos</span>';
+  const ccElUSD=document.getElementById('tbl-resumenUSD-cc');
+  const caElUSD=document.getElementById('tbl-resumenUSD-ca');
+  if(ccElUSD) ccElUSD.innerHTML=fmtMWh2(eMWh_CC2);
+  if(caElUSD) caElUSD.innerHTML=fmtMWh2(eMWh_CA2);
 
   _buildResumenCharts('cEnergiaResUSD',null,null,true);
 }
