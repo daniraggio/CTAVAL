@@ -2062,7 +2062,8 @@ function buildCvpTotal(){
   mkChart('cCvpTotal',{type:'line',data:{labels:monthDates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
 
   // Table: daily CVP total per machine + total
-  const hdrs=HOURS.map(h=>`<th class="num">${h+1}</th>`).join('');
+  const _HRS=Array.from({length:24},(_,i)=>i);
+  const hdrs=_HRS.map(h=>`<th class="num">${h+1}</th>`).join('');
   let tblHtml=`<thead><tr><th>Fecha</th><th>Máquina</th>${hdrs}<th class="num">Prom</th></tr></thead><tbody>`;
   monthDates.forEach(fecha=>{
     MKEYS.forEach((m,mi)=>{
@@ -2096,7 +2097,7 @@ function buildCvpTotal(){
   if(perMaqEl){
     let perHtml='';
     MKEYS.forEach((m,mi)=>{
-      const hdrs2=HOURS.map(h=>`<th class="num">${h+1}</th>`).join('');
+      const hdrs2=_HRS.map(h=>`<th class="num">${h+1}</th>`).join('');
       let rows='';
       monthDates.forEach(fecha=>{
         const c=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
