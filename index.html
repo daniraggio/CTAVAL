@@ -247,6 +247,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
     <div class="card" style="margin-top:18px;overflow-x:auto">
       <table class="tbl"><tbody id="tbl-cvpTotal-dbg"></tbody></table>
     </div>
+    <div class="card" style="margin-top:18px;padding:20px 24px">
+      <div id="tbl-cvpTotal-permaq"></div>
+    </div>
   </div>
   <div class="sec" id="sec-combrem">
     <div class="kr" id="kpi-combrem"></div>
@@ -2085,9 +2088,45 @@ function buildCvpTotal(){
     });
   });
   document.getElementById('tbl-cvpTotal-dbg').innerHTML=tblHtml+'</tbody>';
-  // Tabs just show "Todos" for now
   document.getElementById('tabs-cvpTotal').innerHTML='';
   document.getElementById('cvpTotalTitle').textContent='CVP Total — Comb + Transp + O&M';
+
+  // Per-machine individual tables
+  const perMaqEl=document.getElementById('tbl-cvpTotal-permaq');
+  if(perMaqEl){
+    let perHtml='';
+    MKEYS.forEach((m,mi)=>{
+      const hdrs2=HOURS.map(h=>`<th class="num">${h+1}</th>`).join('');
+      let rows='';
+      monthDates.forEach(fecha=>{
+        const c=getRows(COMBKEYS[m]).find(x=>x.fecha===fecha);
+        const t=getRows(TRANSPKEYS[m]).find(x=>x.fecha===fecha);
+        const o=getRows(OYMKEYS[m]).find(x=>x.fecha===fecha);
+        const hasData=c||t||o;
+        const ch=c?.h||Array(24).fill(c?.avg||0);
+        const th2=t?.h||Array(24).fill(t?.avg||0);
+        const oh=o?.h||Array(24).fill(o?.avg||0);
+        const tots=Array.from({length:24},(_,i)=>(ch[i]||0)+(th2[i]||0)+(oh[i]||0));
+        const avg=tots.reduce((a,b)=>a+b,0)/24;
+        rows+=`<tr><td class="rl">${fmtDate(fecha)}</td>`;
+        if(hasData){
+          tots.forEach(v=>{ rows+=`<td class="num" style="font-size:10px;${v>0?'background:rgba(79,142,247,0.1)':''}">${v>0?fmtK(v):''}</td>`; });
+          rows+=`<td class="num" style="color:var(--accent)">${fmtK(avg)}</td>`;
+        } else {
+          rows+=Array(25).fill(`<td class="num" style="color:var(--border2)">—</td>`).join('');
+        }
+        rows+='</tr>';
+      });
+      perHtml+=`<div style="margin-bottom:28px">
+        <div style="font-size:12px;font-weight:700;color:${CL[mi]};margin-bottom:8px">${m} — CVP Total (Comb + Transp + O&M)</div>
+        <div style="overflow-x:auto"><table class="tbl">
+          <thead><tr><th>Fecha</th>${hdrs2}<th class="num">Prom</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+      </div>`;
+    });
+    perMaqEl.innerHTML=perHtml;
+  }
 }
 function buildCombrem(){
   const {cvp}=getComputedTotals();
