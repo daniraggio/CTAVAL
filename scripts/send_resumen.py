@@ -40,7 +40,10 @@ def take_screenshot():
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(6_000)
         try:
-            page.locator("#sec-resumen").screenshot(path=str(SCREENSHOT_PATH))
+            # Navigate to Resumen (USD) section
+            page.evaluate("showSec('resumenUSD')")
+            page.wait_for_timeout(2_000)
+            page.locator("#sec-resumenUSD").screenshot(path=str(SCREENSHOT_PATH))
         except:
             page.screenshot(path=str(SCREENSHOT_PATH))
         browser.close()
