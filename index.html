@@ -2137,7 +2137,7 @@ function buildIndisp(){
     '2026_01':{TC:1299.9999,KP:0.9,
       maq:{TG23:{hs:469,e:4070,rem:239534406,gas:225172750,mwhrp:5390,rem_pot:75675594},
            TG22:{hs:744,e:0,rem:0,gas:0,mwhrp:0,rem_pot:0},
-           TV11:{hs:470,e:1982,rem:116640042,gas:109665215,mwhrp:2608,rem_pot:36610701},
+           TV11:{hs:470,e:1961,rem:115412032,gas:108492325,mwhrp:2608,rem_pot:36610701},
            TV12:{hs:744,e:0,rem:0,gas:0,mwhrp:0,rem_pot:0}}},
     '2026_02':{TC:1408.966,KP:0.9,
       maq:{TG23:{hs:24,e:0,rem:0,gas:0,mwhrp:133,rem_pot:2019487},
@@ -2148,22 +2148,22 @@ function buildIndisp(){
       maq:{TG23:{hs:81,e:269,rem:18761406,gas:18018766,mwhrp:313,rem_pot:4678632},
            TG22:{hs:514,e:5558,rem:359483833,gas:265495188,mwhrp:5212,rem_pot:77841768},
            TV11:{hs:81,e:137,rem:9557602,gas:9179280,mwhrp:160,rem_pot:2383431},
-           TV12:{hs:524,e:2661,rem:172298763,gas:126959236,mwhrp:2491,rem_pot:37200035}}},
+           TV12:{hs:524,e:2650,rem:173528579,gas:128474102,mwhrp:2491,rem_pot:37200035}}},
     '2026_04':{TC:1381.0954,KP:0.9,
       maq:{TG23:{hs:289,e:1999,rem:168117935,gas:137847736,mwhrp:3389,rem_pot:50549137},
            TG22:{hs:514,e:5923,rem:434452932,gas:322828069,mwhrp:5801,rem_pot:86530461},
-           TV11:{hs:342,e:3449,rem:195227854,gas:161921723,mwhrp:2031,rem_pot:30301390},
-           TV12:{hs:626,e:5728,rem:352001818,gas:266952612,mwhrp:3430,rem_pot:51159806}}},
+           TV11:{hs:342,e:3449,rem:209803137,gas:174243509,mwhrp:2031,rem_pot:30301390},
+           TV12:{hs:626,e:5717,rem:377625981,gas:292320667,mwhrp:3430,rem_pot:51159806}}},
     '2026_05':{TC:1410.29,KP:0.9,
       maq:{TG23:{hs:79,e:1090,rem:144657376,gas:132447150,mwhrp:372,rem_pot:5660269},
            TG22:{hs:159,e:3123,rem:335668725,gas:279630277,mwhrp:1324,rem_pot:20165105},
-           TV11:{hs:162,e:1499,rem:142832048,gas:123634500,mwhrp:850,rem_pot:12940370},
-           TV12:{hs:493,e:5037,rem:542393870,gas:428700609,mwhrp:2728,rem_pot:41556042}}},
+           TV11:{hs:162,e:1440,rem:161799831,gas:138615511,mwhrp:850,rem_pot:12940370},
+           TV12:{hs:493,e:4938,rem:659899590,gas:555223145,mwhrp:2728,rem_pot:41556042}}},
     '2026_06':{TC:1442.41,KP:1.1,
       maq:{TG23:{hs:68,e:1685,rem:194444268,gas:147396571,mwhrp:1090,rem_pot:20755299},
            TG22:{hs:169,e:3722,rem:420064385,gas:306650795,mwhrp:2148,rem_pot:40902847},
            TV11:{hs:69,e:787,rem:80036806,gas:58609720,mwhrp:513,rem_pot:9772564},
-           TV12:{hs:453,e:4410,rem:464312917,gas:328020344,mwhrp:2283,rem_pot:43462350}}},
+           TV12:{hs:453,e:4328,rem:543534964,gas:416813247,mwhrp:2283,rem_pot:43462350}}},
   };
 
   const MKEYS=['TG23','TG22','TV11','TV12'];
@@ -2218,12 +2218,12 @@ function buildIndisp(){
               <th style="text-align:left;padding:5px 8px;color:var(--muted);font-weight:500">Máquina</th>
               <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">Hs indisp.</th>
               <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">E (MWh)</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">Rem E</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--danger);font-weight:500">Gas</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--success);font-weight:500">Renta E</th>
+              <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">Rem E ($)</th>
+              <th style="text-align:right;padding:5px 8px;color:var(--danger);font-weight:500">Gas ($)</th>
+              <th style="text-align:right;padding:5px 8px;color:var(--success);font-weight:500">Renta E ($)</th>
               <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">MW·hrp</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--success);font-weight:500">Rem Pot</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--accent);font-weight:500">Total USD</th>
+              <th style="text-align:right;padding:5px 8px;color:var(--success);font-weight:500">Rem Pot ($)</th>
+              <th style="text-align:right;padding:5px 8px;color:var(--accent);font-weight:500">Renta E + Rem Pot (USD)</th>
             </tr>
           </thead>
           <tbody>
@@ -2240,7 +2240,7 @@ function buildIndisp(){
                 <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:500">$${fmtK(renta)}</td>
                 <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(v.mwhrp))}</td>
                 <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtK(v.rem_pot)}</td>
-                <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${v.hs>0?'USD '+fmtU(Math.round(tot)):'-'}</td>
+                <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${v.hs>0?'$'+fmtK(renta+v.rem_pot)+'<br><span style="font-size:11px;color:var(--teal)">USD '+fmtU(Math.round(tot))+'</span>':'-'}</td>
               </tr>`;
             }).join('')}
             <tr style="border-top:1px solid var(--border2);font-weight:600">
@@ -2252,7 +2252,7 @@ function buildIndisp(){
               <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtK(totRenta)}</td>
               <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(totMW))}</td>
               <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtK(totPot)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--accent)">USD ${fmtU(Math.round(totTotal/TC))}</td>
+              <td style="text-align:right;padding:6px 8px;color:var(--accent)">$${fmtK(totRenta+totPot)}<br><span style="font-size:11px;color:var(--teal)">USD ${fmtU(Math.round(totTotal/TC))}</span></td>
             </tr>
           </tbody>
         </table>
