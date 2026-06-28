@@ -3209,6 +3209,10 @@ function applyPrefs(prefs) {
   if (prefs.MONTH_CFG) {
     Object.keys(prefs.MONTH_CFG).forEach(k => {
       if (MONTH_CFG[k]) Object.assign(MONTH_CFG[k], prefs.MONTH_CFG[k]);
+      // Also populate TC_CACHE so getTC() picks it up immediately
+      if (prefs.MONTH_CFG[k]?.TC) {
+        TC_CACHE[k] = {tc: prefs.MONTH_CFG[k].TC, date: prefs.MONTH_CFG[k].TCDate || null};
+      }
     });
   }
 }
