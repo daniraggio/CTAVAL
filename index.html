@@ -252,6 +252,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="card-hdr"><div><div class="card-title">CMO diario completo</div><div class="card-sub">USD/MWh</div></div></div>
       <div class="cw" style="height:300px"><canvas id="cCmoUSD" role="img" aria-label="CMO diario USD"></canvas></div>
     </div>
+    <div class="card" style="margin-top:18px;padding:20px 24px">
+      <div id="tbl-cmo-horario"></div>
+    </div>
   </div>
 
   <!-- CVP COMBREM -->
@@ -2035,6 +2038,41 @@ function buildCmo(){
   mkChart('cCmoFull',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO $/MWh',data:avgs,borderColor:'#fbbf24',backgroundColor:'#fbbf2415',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>'$'+fmtK(v)}}}}});
   const avgsUSD=tc?avgs.map(v=>v/tc):avgs;
   mkChart('cCmoUSD',{type:'line',data:{labels:rows.map(r=>fmtDate(r.fecha)),datasets:[{label:'CMO USD/MWh',data:avgsUSD,borderColor:'#34d399',backgroundColor:'#34d39915',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>fmtN(v,0)+' USD'}}}}});
+
+  // CMO hourly tables
+  const dates=rows.map(r=>r.fecha);
+  const cmoMatrix={};
+  dates.forEach(fecha=>{ const cr=rows.find(x=>x.fecha===fecha); cmoMatrix[fecha]=cr?.h||Array(24).fill(cr?.avg??null); });
+  function fmtARS(v){return'$'+fmtK(v);}
+  function fmtUSD2(v){return fmtN(v,1);}
+  function mkCmoTable(label,valFn,fmtFn,color){
+    const hdrs=Array.from({length:24},(_,h)=>`<th class="num" style="font-size:10px">${h+1}</th>`).join('');
+    const trows=dates.map(fecha=>{
+      const cells=Array.from({length:24},(_,h)=>{
+        const v=cmoMatrix[fecha]?.[h]; const fv=v!=null?valFn(v):null;
+        return `<td class="num" style="font-size:11px;${fv!=null?'color:'+color:''}">${fv!=null?fmtFn(fv):'—'}</td>`;
+      }).join('');
+      const dayAvg=rows.find(x=>x.fecha===fecha)?.avg;
+      const dayVal=dayAvg!=null?valFn(dayAvg):null;
+      return `<tr><td class="lbl" style="font-size:11px">${fmtDate(fecha)}</td>${cells}<td class="num" style="font-weight:700;color:${color}">${dayVal!=null?fmtFn(dayVal):'—'}</td></tr>`;
+    }).join('');
+    const allVals=dates.flatMap(f=>Array.from({length:24},(_,h)=>cmoMatrix[f]?.[h]).filter(v=>v!=null));
+    const grandAvg=allVals.length?allVals.reduce((a,b)=>a+b,0)/allVals.length:null;
+    const totCells=Array.from({length:24},(_,h)=>{
+      const vals=dates.map(f=>cmoMatrix[f]?.[h]).filter(v=>v!=null);
+      const a=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
+      return `<td class="num" style="font-weight:700;font-size:11px;color:${color}">${a!=null?fmtFn(valFn(a)):'—'}</td>`;
+    }).join('');
+    return `<div style="margin-bottom:28px"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">${label}</div>
+      <div style="overflow-x:auto"><table class="tbl" style="min-width:900px;font-size:11px">
+        <thead><tr><th style="min-width:80px">Fecha</th>${hdrs}<th class="num" style="font-size:10px">Prom. día</th></tr></thead>
+        <tbody>${trows}<tr class="hi"><td class="lbl" style="font-weight:700">Prom. hora</td>${totCells}<td class="num" style="font-weight:700;color:${color}">${grandAvg!=null?fmtFn(valFn(grandAvg)):'—'}</td></tr></tbody>
+      </table></div></div>`;
+  }
+  const cmoTblARS=mkCmoTable('CMO hora a hora ($/MWh)',v=>v,fmtARS,'var(--warn)');
+  const cmoTblUSD=mkCmoTable('CMO hora a hora (USD/MWh)',v=>v/tc,fmtUSD2,'var(--warn)');
+  const cmoTblEl=document.getElementById('tbl-cmo-horario');
+  if(cmoTblEl) cmoTblEl.innerHTML=cmoTblARS+cmoTblUSD;
 }
 
 // ── GENERIC CVP ────────────────────────────────────────────────────────────
@@ -2228,9 +2266,25 @@ function buildIndisp(){
 function buildCvpTotal(){
   const {cvp}=getComputedTotals();
   const totalMes=cvp.combTotal+cvp.transpTotal+cvp.oymTotal;
+  const tc2=getTC();
   document.getElementById('kpi-cvpTotal').innerHTML=MKEYS.map((m,i)=>{
     const t=(cvp['comb'+m]||0)+(cvp['transp'+m]||0)+(cvp['oym'+m]||0);
-    return `<div class="kpi"><div class="kpi-lbl">${m} CVP Total</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(t)}</div><div class="kpi-unit">$ mes</div></div>`;
+    // Calc avg CVP $/MWh (weighted by energy)
+    let sumCVP=0,sumE=0;
+    getRows(EKEYS[m]).forEach(er=>{
+      const c=getRows(COMBKEYS[m]).find(x=>x.fecha===er.fecha);
+      const t2=getRows(TRANSPKEYS[m]).find(x=>x.fecha===er.fecha);
+      const o=getRows(OYMKEYS[m]).find(x=>x.fecha===er.fecha);
+      const eh=er.h||Array(24).fill(er.avg||0);
+      for(let h=0;h<24;h++){
+        const e=eh[h]||0; if(!e) continue;
+        const cv=(c?.h?c.h[h]??c?.avg:c?.avg||0)+(t2?.h?t2.h[h]??t2?.avg:t2?.avg||0)+(o?.h?o.h[h]??o?.avg:o?.avg||0);
+        sumCVP+=cv*e; sumE+=e;
+      }
+    });
+    const avgCVP=sumE>0?sumCVP/sumE:0;
+    const avgUSD=tc2>0?avgCVP/tc2:0;
+    return `<div class="kpi"><div class="kpi-lbl">${m} CVP Total</div><div class="kpi-val" style="color:${CL[i]}">${fmtK(t)}</div><div class="kpi-unit">$ mes · prom ${fmtK(avgCVP)}/MWh · ${fmtN(avgUSD,1)} USD/MWh</div></div>`;
   }).join('')+
   `<div class="kpi" style="border-color:rgba(79,142,247,.35)"><div class="kpi-lbl">TOTAL MES</div><div class="kpi-val a">${fmtK(totalMes)}</div><div class="kpi-unit">$ mes</div></div>`;
 
@@ -2929,10 +2983,7 @@ function buildRentaMarginal(){
       </div>
     </div>`;
   }
-  const cmoTableARS=mkCmoTable('Costo Marginal Operado ($/MWh)',v=>v,fmtARS,'var(--warn)');
-  const cmoTableUSD=mkCmoTable('Costo Marginal Operado (USD/MWh)',v=>v/tc,fmtUSD2,'var(--warn)');
-  const cmoSep=`<div style="font-size:14px;font-weight:700;color:var(--muted);margin:32px 0 16px;border-top:1px solid var(--border);padding-top:20px">CMO — Costo Marginal Operado</div>`;
-  document.getElementById('rentamarginal-content').innerHTML=kpiHtml+tableARS+tableUSD+cmoSep+cmoTableARS+cmoTableUSD;
+  document.getElementById('rentamarginal-content').innerHTML=kpiHtml+tableARS+tableUSD;
 }
 
 // ── ESTADO OPERATIVO ─────────────────────────────────────────────────────────
