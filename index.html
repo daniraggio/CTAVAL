@@ -1303,6 +1303,7 @@ const fmtN=(n,d=0)=>n==null?'—':n.toLocaleString('es-AR',{minimumFractionDigit
 const fmtFull=n=>n==null||isNaN(n)?'—':Math.round(n).toLocaleString('es-AR');
 // Compact for charts/small spaces
 const fmtK=n=>{if(n==null||isNaN(n))return'—';const a=Math.abs(n);if(a>=1e9)return(n/1e9).toFixed(2)+'B';if(a>=1e6)return(n/1e6).toFixed(2)+'M';if(a>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(0);};
+const fmtM=n=>{if(n==null||isNaN(n))return'—';return(n/1e6).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})+' M';};
 function lerpColor(v,mn,mx){if(mx===mn)return'rgba(79,142,247,0.3)';const t=(v-mn)/(mx-mn);if(t<0.33)return`rgba(45,212,191,${0.2+t*1.5})`;if(t<0.66)return`rgba(251,191,36,${0.4+t})`;return`rgba(248,113,113,${0.5+t*0.5})`;}
 let charts={};
 function mkChart(id,cfg){
@@ -2252,24 +2253,24 @@ function buildIndisp(){
                 <td style="padding:6px 8px;font-weight:600;color:${CL[i]}">${m}</td>
                 <td style="text-align:right;padding:6px 8px;color:var(--muted)">${v.hs}</td>
                 <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(v.e))}</td>
-                <td style="text-align:right;padding:6px 8px">$${fmtK(v.rem)}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--danger)">$${fmtK(v.gas)}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:500">$${fmtK(renta)}</td>
+                <td style="text-align:right;padding:6px 8px">$${fmtM(v.rem)}</td>
+                <td style="text-align:right;padding:6px 8px;color:var(--danger)">$${fmtM(v.gas)}</td>
+                <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:500">$${fmtM(renta)}</td>
                 <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(v.mwhrp))}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtK(v.rem_pot)}</td>
-                <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${v.hs>0?'$'+fmtK(renta+v.rem_pot)+'<br><span style="font-size:11px;color:var(--teal)">USD '+fmtU(Math.round(tot))+'</span>':'-'}</td>
+                <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtM(v.rem_pot)}</td>
+                <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${v.hs>0?'$'+fmtM(renta+v.rem_pot)+'<br><span style="font-size:11px;color:var(--teal)">USD '+fmtU(Math.round(tot))+'</span>':'-'}</td>
               </tr>`;
             }).join('')}
             <tr style="border-top:1px solid var(--border2);font-weight:600">
               <td style="padding:6px 8px;color:var(--muted)">TOTAL</td>
               <td style="text-align:right;padding:6px 8px;color:var(--muted)">${MKEYS.reduce((s,m)=>s+d.maq[m].hs,0)}</td>
               <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(totE))}</td>
-              <td style="text-align:right;padding:6px 8px">$${fmtK(totRem)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--danger)">$${fmtK(totGas)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtK(totRenta)}</td>
+              <td style="text-align:right;padding:6px 8px">$${fmtM(totRem)}</td>
+              <td style="text-align:right;padding:6px 8px;color:var(--danger)">$${fmtM(totGas)}</td>
+              <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtM(totRenta)}</td>
               <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(totMW))}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtK(totPot)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--accent)">$${fmtK(totRenta+totPot)}<br><span style="font-size:11px;color:var(--teal)">USD ${fmtU(Math.round(totTotal/TC))}</span></td>
+              <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtM(totPot)}</td>
+              <td style="text-align:right;padding:6px 8px;color:var(--accent)">$${fmtM(totRenta+totPot)}<br><span style="font-size:11px;color:var(--teal)">USD ${fmtU(Math.round(totTotal/TC))}</span></td>
             </tr>
           </tbody>
         </table>
