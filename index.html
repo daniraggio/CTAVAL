@@ -2204,8 +2204,6 @@ function buildIndisp(){
   html+=`<div class="kr" style="margin-bottom:18px">
     <div class="kpi"><div class="kpi-lbl">Total hs indisp.</div><div class="kpi-val w">${fmtU(totalHs)}</div><div class="kpi-unit">h·máquina · ene-jun 2026</div></div>
     <div class="kpi"><div class="kpi-lbl">Energía potencial adicional</div><div class="kpi-val a">${fmtU(totalE)}</div><div class="kpi-unit">MWh acumulado</div></div>
-    <div class="kpi"><div class="kpi-lbl">Rem. energía adicional</div><div class="kpi-val" style="color:var(--text)">USD ${fmtU(Math.round(grandRemE))}</div><div class="kpi-unit">acumulado</div></div>
-    <div class="kpi"><div class="kpi-lbl">Costo gas adicional</div><div class="kpi-val" style="color:var(--danger)">USD ${fmtU(Math.round(grandGas))}</div><div class="kpi-unit">acumulado</div></div>
     <div class="kpi"><div class="kpi-lbl">Renta E adicional</div><div class="kpi-val s">USD ${fmtU(Math.round(grandRentaE))}</div><div class="kpi-unit">acumulado</div></div>
     <div class="kpi"><div class="kpi-lbl">Rem. potencia adicional</div><div class="kpi-val d">USD ${fmtU(Math.round(grandRemPot))}</div><div class="kpi-unit">acumulado</div></div>
     <div class="kpi" style="border-color:rgba(79,142,247,.5)"><div class="kpi-lbl">Remuneración total perdida</div><div class="kpi-val" style="color:var(--accent);font-size:22px">USD ${fmtU(Math.round(grandTotal))}</div><div class="kpi-unit">Renta E + Rem. Pot. · ene-jun 2026</div></div>
