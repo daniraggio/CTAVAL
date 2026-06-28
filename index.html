@@ -2269,17 +2269,17 @@ function buildCvpTotal(){
   const tc2=getTC();
   document.getElementById('kpi-cvpTotal').innerHTML=MKEYS.map((m,i)=>{
     const t=(cvp['comb'+m]||0)+(cvp['transp'+m]||0)+(cvp['oym'+m]||0);
-    // Calc avg CVP $/MWh (weighted by energy)
+    // Avg CVP $/MWh weighted by energy
     let sumCVP=0,sumE=0;
+    const getVal=(row,h)=>{if(!row)return 0;const v=row.h?row.h[h]:null;return(v!=null?v:row.avg)||0;};
     getRows(EKEYS[m]).forEach(er=>{
-      const c=getRows(COMBKEYS[m]).find(x=>x.fecha===er.fecha);
-      const t2=getRows(TRANSPKEYS[m]).find(x=>x.fecha===er.fecha);
-      const o=getRows(OYMKEYS[m]).find(x=>x.fecha===er.fecha);
+      const cr=getRows(COMBKEYS[m]).find(x=>x.fecha===er.fecha);
+      const tr=getRows(TRANSPKEYS[m]).find(x=>x.fecha===er.fecha);
+      const or2=getRows(OYMKEYS[m]).find(x=>x.fecha===er.fecha);
       const eh=er.h||Array(24).fill(er.avg||0);
       for(let h=0;h<24;h++){
         const e=eh[h]||0; if(!e) continue;
-        const cv=(c?.h?c.h[h]??c?.avg:c?.avg||0)+(t2?.h?t2.h[h]??t2?.avg:t2?.avg||0)+(o?.h?o.h[h]??o?.avg:o?.avg||0);
-        sumCVP+=cv*e; sumE+=e;
+        sumCVP+=(getVal(cr,h)+getVal(tr,h)+getVal(or2,h))*e; sumE+=e;
       }
     });
     const avgCVP=sumE>0?sumCVP/sumE:0;
