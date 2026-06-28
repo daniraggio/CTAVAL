@@ -2193,11 +2193,13 @@ function buildIndisp(){
     });
   });
   // Grand totals across all months
-  const grandRentaE=months.reduce((s,k)=>{const d=INDISP_DATA[k];return s+MKEYS.reduce((ss,m)=>ss+(d.maq[m].rem-d.maq[m].gas),0)/d.TC;},0);
-  const grandRemPot=months.reduce((s,k)=>{const d=INDISP_DATA[k];return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].rem_pot,0)/d.TC;},0);
+  // Use TC from MONTH_CFG (updated from config.json) when available, fallback to hardcoded
+  const getIndispTC=(k)=>TC_CACHE[k]?.tc||MONTH_CFG[k]?.TC||INDISP_DATA[k].TC;
+  const grandRentaE=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+(d.maq[m].rem-d.maq[m].gas),0)/tc;},0);
+  const grandRemPot=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].rem_pot,0)/tc;},0);
   const grandTotal=grandRentaE+grandRemPot;
-  const grandRemE=months.reduce((s,k)=>{const d=INDISP_DATA[k];return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].rem,0)/d.TC;},0);
-  const grandGas=months.reduce((s,k)=>{const d=INDISP_DATA[k];return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].gas,0)/d.TC;},0);
+  const grandRemE=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].rem,0)/tc;},0);
+  const grandGas=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].gas,0)/tc;},0);
 
   html+=`<div class="kr" style="margin-bottom:18px">
     <div class="kpi"><div class="kpi-lbl">Total hs indisp.</div><div class="kpi-val w">${fmtU(totalHs)}</div><div class="kpi-unit">h·máquina · ene-jun 2026</div></div>
@@ -2211,7 +2213,7 @@ function buildIndisp(){
 
   // Table per month
   months.forEach(k=>{
-    const d=INDISP_DATA[k]; const TC=d.TC;
+    const d=INDISP_DATA[k]; const TC=TC_CACHE[k]?.tc||MONTH_CFG[k]?.TC||d.TC;
     const [yr,mm]=k.split('_');
     const mesNombre=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][parseInt(mm)];
     const totE=MKEYS.reduce((s,m)=>s+d.maq[m].e,0);
