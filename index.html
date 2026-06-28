@@ -2131,14 +2131,21 @@ function buildIndisp(){
   const el=document.getElementById('indisp-content');
   if(!el)return;
   const tc=getTC();
+  const METODOLOGIA=`<div style="background:var(--surface2);border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7">
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Metodología del cálculo</div>
+    <b>Energía adicional:</b> Solo en horas i-i/lib donde CMO×FP &gt; CVP (hubiera convenido despachar). Potencia generada = POT_NOM de cada máquina (máximo mensual; si la máquina no generó en el mes, se usa el máximo histórico de todos los meses). Remuneración = misma fórmula que el cálculo real: CVP + MAX(RMIN ; (CMO×FP − CVP) × FRA × FRC). Costo gas = (CVP_Comb + CVP_Transp) × E.<br>
+    <b>CVP en horas i-i:</b> Se busca en orden: (1) hoja propia de la máquina · (2) partner del ciclo combinado (TG23↔TV11, TG22↔TV12) · (3) otra máquina del mismo grupo · (4) CVP promedio mensual como proxy.<br>
+    <b>Potencia adicional:</b> En todas las horas HRP (PPAD &gt; 0), sin filtro de CMO. Rem. Potencia = POT_NOM × KP × PPAD × TC.<br>
+    <b>Total:</b> Renta E (Rem E − Gas) + Rem. Potencia.
+  </div>`;
 
   // Pre-calculated results per month (from Python analysis)
   const INDISP_DATA={
     '2026_01':{TC:1299.9999,KP:0.9,
       maq:{TG23:{hs:469,e:4070,rem:239534406,gas:225172750,mwhrp:5390,rem_pot:75675594},
-           TG22:{hs:744,e:0,rem:0,gas:0,mwhrp:0,rem_pot:0},
+           TG22:{hs:744,e:9417,rem:613841256,gas:514730072,mwhrp:9642,rem_pot:135377601},
            TV11:{hs:470,e:1961,rem:115412032,gas:108492325,mwhrp:2608,rem_pot:36610701},
-           TV12:{hs:744,e:0,rem:0,gas:0,mwhrp:0,rem_pot:0}}},
+           TV12:{hs:744,e:4318,rem:280484787,gas:236092420,mwhrp:4285,rem_pot:60155779}}},
     '2026_02':{TC:1408.966,KP:0.9,
       maq:{TG23:{hs:24,e:0,rem:0,gas:0,mwhrp:133,rem_pot:2019487},
            TG22:{hs:351,e:4321,rem:303852829,gas:247523876,mwhrp:3548,rem_pot:53993675},
@@ -2260,7 +2267,7 @@ function buildIndisp(){
     </div>`;
   });
 
-  el.innerHTML=html;
+  el.innerHTML=METODOLOGIA+html;
 }
 
 function buildCvpTotal(){
