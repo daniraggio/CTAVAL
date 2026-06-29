@@ -785,6 +785,14 @@ function getTCDate(){
 
 async function ensureTC(){
   if(TC_CACHE[MONTH]?.tc) return;
+  // Only fetch live TC for the current month — past months use the config value
+  const now=new Date(); const curKey=`${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}`;
+  if(MONTH !== curKey){
+    // Past month: use MONTH_CFG value, don't call API
+    const cfgTC=MONTH_CFG[MONTH]?.TC;
+    if(cfgTC) TC_CACHE[MONTH]={tc:cfgTC,date:MONTH_CFG[MONTH]?.TCDate||null};
+    return;
+  }
   const result=await fetchTCFromBCRA(MONTH);
   if(result){
     TC_CACHE[MONTH]={tc:result.tc,date:result.date};
