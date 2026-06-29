@@ -3288,11 +3288,21 @@ function initDashboard(loadedData) {
   // Set current month to most recent
   MONTH = keys[keys.length - 1];
 
-  // Priority: repo config.json (shared/committed) < localStorage (local overrides)
-  // Both are already loaded: repoPrefs passed in, localStorage read now
+  // Priority: localStorage (local overrides) < repo config.json TC (official committed value)
+  // Apply repo prefs first, then localStorage overrides — EXCEPT for TC which always uses repo value
   if (loadedData.repoPrefs) applyPrefs(loadedData.repoPrefs);
   const localPrefs = loadPrefs();
   if (localPrefs) applyPrefs(localPrefs);
+  // Re-apply repo TC after localStorage to ensure committed TC values win
+  if (loadedData.repoPrefs?.MONTH_CFG) {
+    Object.keys(loadedData.repoPrefs.MONTH_CFG).forEach(k => {
+      const repoTC = loadedData.repoPrefs.MONTH_CFG[k]?.TC;
+      if (repoTC) {
+        if (MONTH_CFG[k]) MONTH_CFG[k].TC = repoTC;
+        TC_CACHE[k] = {tc: repoTC, date: loadedData.repoPrefs.MONTH_CFG[k]?.TCDate || null};
+      }
+    });
+  }
 
   // Restore last-viewed month (local prefs take priority)
   const lastMonth = localPrefs?.LAST_MONTH || loadedData.repoPrefs?.LAST_MONTH;
