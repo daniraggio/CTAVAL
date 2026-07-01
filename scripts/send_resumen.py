@@ -40,6 +40,22 @@ def take_screenshot():
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(6_000)
         try:
+            # Select the last month that has actual data (may differ from current calendar month)
+            last_month_with_data = page.evaluate("""() => {
+                const sel = document.getElementById('monthSel');
+                if (!sel) return null;
+                // Find last month with energy data
+                const opts = Array.from(sel.options).map(o => o.value);
+                for (let i = opts.length - 1; i >= 0; i--) {
+                    const k = opts[i];
+                    const eRows = ALL_DATA[k] && ALL_DATA[k]['AVALTG23-ENERGIA'];
+                    if (eRows && eRows.rows && eRows.rows.length > 0) return k;
+                }
+                return opts[opts.length - 1];
+            }""")
+            if last_month_with_data:
+                page.evaluate(f"selectMonth('{last_month_with_data}')")
+                page.wait_for_timeout(2_000)
             # Navigate to Resumen (USD) section
             page.evaluate("showSec('resumenUSD')")
             page.wait_for_timeout(2_000)
@@ -125,8 +141,18 @@ def send_email(html_body, subject):
 
 
 def current_month_xls():
-    """Devuelve el Path del .xls del mes actual (Argentina)."""
+    """Devuelve el Path del .xls del último mes con datos disponibles."""
     now = datetime.now(ARG_TZ)
+    # Try current month first, then go back until we find an existing file
+    for delta in range(3):
+        month = now.month - delta
+        year = now.year
+        if month <= 0:
+            month += 12
+            year -= 1
+        path = DATA_DIR / f"AVAL_{year}_{month:02d}.xls"
+        if path.exists():
+            return path
     return DATA_DIR / f"AVAL_{now.year}_{now.month:02d}.xls"
 
 
