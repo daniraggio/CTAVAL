@@ -157,11 +157,33 @@ def current_month_xls():
 
 
 def file_hash(path):
+    """Hash solo las filas de datos del XLS (ignora metadatos como fecha de generación)."""
     if not path.exists():
         return None
-    h = hashlib.sha256()
-    h.update(path.read_bytes())
-    return h.hexdigest()
+    try:
+        import openpyxl
+        from datetime import datetime as dt
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        h = hashlib.sha256()
+        # Hash the data rows of key sheets only
+        key_sheets = ['AVALTG23-ENERGIA', 'AVALTG22-ENERGIA', 'AVALTV11-ENERGIA', 'AVALTV12-ENERGIA',
+                      'PRECIOS-CMO', 'AVALTG23-CVPCOMBREM-GX', 'AVALTG22-CVPCOMBREM-GX']
+        for sheet in key_sheets:
+            if sheet not in wb.sheetnames:
+                continue
+            for row in wb[sheet].iter_rows(values_only=True):
+                if isinstance(row[0], dt):
+                    # Only hash date + numeric values, skip metadata rows
+                    row_str = str(row[0].date()) + '|' + '|'.join(
+                        str(round(v, 4)) if isinstance(v, float) else str(v)
+                        for v in row[2:26]
+                    )
+                    h.update(row_str.encode())
+        wb.close()
+        return h.hexdigest()
+    except Exception:
+        # Fallback to full file hash
+        return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def get_last_email_state():
@@ -197,7 +219,10 @@ if __name__ == "__main__":
         current_hash = file_hash(xls_path)
         state, state_sha = get_last_email_state()
 
-        if current_hash and state.get("hash") == current_hash:
+        # If state uses old hash method (no 'v' key), force resend once to recalibrate
+        state_hash = state.get("hash") if state.get("v") == 2 else None
+
+        if current_hash and state_hash == current_hash:
             print(f"  ℹ️  Sin novedades en {xls_path.name} desde el último mail — no se envía.")
         else:
             take_screenshot()
@@ -208,6 +233,8 @@ if __name__ == "__main__":
             if current_hash:
                 state["hash"] = current_hash
                 state["fecha"] = now.isoformat()
+                state["v"] = 2  # mark as data-only hash
+                state["xls"] = xls_path.name
                 save_email_state(state, state_sha)
     except Exception as e:
         print(f"  ❌ Error: {e}")
