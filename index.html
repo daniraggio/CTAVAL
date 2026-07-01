@@ -123,6 +123,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
     <div class="nav-group">
       <div class="nav-label">Energía</div>
       <button class="ni" onclick="showSec('energia')"><span class="nd"></span>Energía MWh</button>
+      <button class="ni" onclick="showSec('spotprice')"><span class="nd"></span>Precio SPOT</button>
       <button class="ni" onclick="showSec('cmo')"><span class="nd"></span>CMO</button>
       <button class="ni" onclick="showSec('indisp')"><span class="nd"></span>Indisponibilidades</button>
     </div>
@@ -241,6 +242,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
   </div>
 
   <!-- CMO -->
+  <div class="sec" id="sec-spotprice">
+    <div class="kr" id="kpi-spotprice"></div>
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">ENER SPOT diario</div><div class="card-sub">USD/MWh — Precio que pagan los Grandes Usuarios</div></div></div>
+      <div class="cw" style="height:300px"><canvas id="cSpotPrice" role="img" aria-label="Precio SPOT diario"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:18px;overflow-x:auto">
+      <table class="tbl"><thead id="thead-spotprice"></thead><tbody id="tbody-spotprice"></tbody></table>
+    </div>
+  </div>
   <div class="sec" id="sec-cmo">
     <div class="kr" id="kpi-cmo"></div>
     <div class="card">
@@ -631,6 +642,34 @@ function fileToMonthKey(filename) {
   const m = filename.match(/AVAL_(\d{4})_(\d{2})\.xls$/i);
   if (!m) return null;
   return {year: m[1], mm: m[2], key: `${m[1]}_${m[2]}`};
+}
+
+async function loadSpotData(){
+  try {
+    const resp = await fetch(SPOT_URL + '?t=' + Date.now());
+    if(!resp.ok) return;
+    const buf = await resp.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const ws = wb.Sheets['Precios'];
+    if(!ws) return;
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:null});
+    for(let i=19; i<rows.length; i++){
+      const row = rows[i];
+      if(!row || !row[3] || !row[5]) continue;
+      let fecha = row[3];
+      if(typeof fecha === 'string') fecha = new Date(fecha);
+      else if(!(fecha instanceof Date)) continue;
+      if(isNaN(fecha)) continue;
+      const y = fecha.getFullYear(); const m = fecha.getMonth()+1;
+      const key = `${y}_${String(m).padStart(2,'0')}`;
+      const fechaStr = `${y}-${String(m).padStart(2,'0')}-${String(fecha.getDate()).padStart(2,'0')}`;
+      const spot = parseFloat(row[5]);
+      if(isNaN(spot)) continue;
+      if(!SPOT_DATA[key]) SPOT_DATA[key]=[];
+      SPOT_DATA[key].push({fecha:fechaStr, spot});
+    }
+    console.log('SPOT data loaded:', Object.keys(SPOT_DATA).length, 'months');
+  } catch(e){ console.warn('SPOT load error:', e); }
 }
 
 async function loadAllData() {
@@ -1336,6 +1375,7 @@ const SMETA={
   resumenUSD:{title:'Resumen en USD',sub:'Tipo de cambio configurable'},
   howitworks:{title:'Cómo funciona este dashboard',sub:'Guía técnica completa — arquitectura, datos y fórmulas'},
   energia:{title:'Energía asignada',sub:'MWh por activo'},
+  spotprice:{title:'Precio SPOT',sub:'ENER SPOT USD/MWh — Grandes Usuarios'},
   cmo:{title:'CMO — Costo Marginal Operado',sub:'$/MWh'},
   indisp:{title:'Indisponibilidades',sub:'Impacto estimado en remuneración y costo de gas'},
   cvpTotal:{title:'CVP Total',sub:'Comb + Transp + O&M — $/MWh por hora'},
@@ -1365,7 +1405,7 @@ function buildSection(id){
   // resumen/resumenUSD are async — never cache them, always rebuild
   const noCache=['resumen','resumenUSD'];
   if(!noCache.includes(id)){if(built.has(id))return;built.add(id);}
-  ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),howitworks:buildHowItWorks,energia:buildEnergia,cmo:buildCmo,indisp:buildIndisp,cvpTotal:buildCvpTotal,
+  ({resumen:()=>buildResumen(),resumenUSD:()=>buildResumenUSD(),howitworks:buildHowItWorks,energia:buildEnergia,cmo:buildCmo,indisp:buildIndisp,spotprice:buildSpotPrice,cvpTotal:buildCvpTotal,
     combrem:buildCombrem,transpprov:buildTranspProv,oym:buildOym,'ctrl-rem':buildCtrlRem,estoperativo:buildEstOperativo,
     costos:buildCostos,potencia:buildPotencia,remuneracion:buildRemuneracion,rentamarginal:buildRentaMarginal,
     heatmap:buildHeatmap,config:buildConfig})[id]?.();
@@ -1562,7 +1602,7 @@ async function buildResumen(){
               <div style="font-size:11px;color:var(--muted);margin-bottom:3px">CMO promedio</div>
               <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--warn)">${Math.round(cmoYest/1000).toLocaleString('es-AR')} <span style="font-size:11px;font-weight:400;color:var(--muted)">k$/MWh</span></div>
             </div>`:''}
-          </div>
+            ${(()=>{const spotMes=SPOT_DATA[MONTH]||[];const spotVals=spotMes.map(r=>r.spot);const spotAvg=spotVals.length?spotVals.reduce((a,b)=>a+b,0)/spotVals.length:null;return spotAvg!=null?`<div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">SPOT promedio mes</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--amber)">${fmtN(spotAvg,2)} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div></div>`:'';})()}
         </div>`;
     }
   }
@@ -1775,6 +1815,7 @@ function _renderResumenUSD(){
             <div style="font-size:11px;color:var(--muted);margin-bottom:3px">CMO promedio</div>
             <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--warn)">${(cmoYest/tc).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div>
           </div>`:''}
+          ${(()=>{const spotMes=SPOT_DATA[MONTH]||[];const spotVals=spotMes.map(r=>r.spot);const spotAvg=spotVals.length?spotVals.reduce((a,b)=>a+b,0)/spotVals.length:null;return spotAvg!=null?`<div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">SPOT promedio mes</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--amber)">${fmtN(spotAvg,2)} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div></div>`:'';})()}
         </div>
       </div>`;
   }
@@ -2136,6 +2177,48 @@ function buildDbgTable(tblId,sheetKey){
   });
   document.getElementById(tblId).innerHTML=html+'</tbody>';
 }
+function buildSpotPrice(){
+  const spotRows = SPOT_DATA[MONTH] || [];
+  const tc = getTC();
+
+  // KPIs
+  const spots = spotRows.map(r=>r.spot);
+  const avg = spots.length ? spots.reduce((a,b)=>a+b,0)/spots.length : null;
+  const mn  = spots.length ? Math.min(...spots) : null;
+  const mx  = spots.length ? Math.max(...spots) : null;
+  const last = spots.length ? spots[spots.length-1] : null;
+
+  document.getElementById('kpi-spotprice').innerHTML = spotRows.length ? `
+    <div class="kpi"><div class="kpi-lbl">Último precio SPOT</div><div class="kpi-val w">${fmtN(last,2)}</div><div class="kpi-unit">USD/MWh · ${fmtDate(spotRows[spotRows.length-1].fecha)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Mínimo mes</div><div class="kpi-val s">${fmtN(mn,2)}</div><div class="kpi-unit">USD/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Precio medio</div><div class="kpi-val a">${fmtN(avg,2)}</div><div class="kpi-unit">USD/MWh · ${fmtN(avg*(tc||1)/1000,1)}K $/MWh</div></div>
+    <div class="kpi"><div class="kpi-lbl">Máximo mes</div><div class="kpi-val d">${fmtN(mx,2)}</div><div class="kpi-unit">USD/MWh</div></div>
+  ` : '<div style="color:var(--muted);padding:12px">Sin datos SPOT para este mes</div>';
+
+  // Chart
+  mkChart('cSpotPrice',{type:'line',data:{
+    labels:spotRows.map(r=>fmtDate(r.fecha)),
+    datasets:[{label:'ENER SPOT (USD/MWh)',data:spotRows.map(r=>r.spot),
+      borderColor:'#f59e0b',backgroundColor:'#f59e0b18',fill:true,tension:0.3,pointRadius:3,borderWidth:2}]
+  },options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:legendOpts},
+    scales:{x:{grid:GR,ticks:{...TK,maxRotation:45}},
+            y:{min:0,grid:GR,ticks:{...TK,callback:v=>fmtN(v,0)+' USD'}}}}});
+
+  // Table
+  const thead = document.getElementById('thead-spotprice');
+  const tbody = document.getElementById('tbody-spotprice');
+  if(!thead||!tbody) return;
+  thead.innerHTML = `<tr><th>Fecha</th><th class="num">ENER SPOT (USD/MWh)</th><th class="num">ENER SPOT ($/MWh)</th></tr>`;
+  tbody.innerHTML = spotRows.map((r,i)=>`
+    <tr style="${i%2?'background:var(--surface2)':''}">
+      <td class="rl">${fmtDate(r.fecha)}</td>
+      <td class="num" style="color:var(--warn)">${fmtN(r.spot,2)}</td>
+      <td class="num">${fmtK(r.spot*(tc||1))}</td>
+    </tr>`).join('')+
+    (avg!=null?`<tr class="hi"><td class="rl">Promedio</td><td class="num" style="color:var(--accent)">${fmtN(avg,2)}</td><td class="num">${fmtK(avg*(tc||1))}</td></tr>`:'');
+}
+
 function buildIndisp(){
   const el=document.getElementById('indisp-content');
   if(!el)return;
@@ -3184,6 +3267,8 @@ function buildEstOperativo(){
 //   2. localStorage — fast runtime cache, fallback if repo config not found
 const PERSIST_KEY = 'ctaval_cfg_v1';
 const CONFIG_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/config.json';
+const SPOT_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/resumen_precios_previstos_xlsx.xlsx';
+let SPOT_DATA = {}; // {YYYY_MM: [{fecha, spot}]}
 
 function savePrefs() {
   try {
@@ -3335,7 +3420,7 @@ window.showSec=showSec;window.setETab=setETab;window.setRemTab=setRemTab;window.
 // Bootstrap: run loader then init
 (async () => {
   try {
-    const loaded = await loadAllData();
+    const loaded = await Promise.all([loadAllData(), loadSpotData()]);
     if (loaded) initDashboard(loaded);
   } catch(e) {
     document.getElementById('load-status').textContent = '❌ Error: ' + e.message;
