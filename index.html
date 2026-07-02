@@ -1602,7 +1602,7 @@ async function buildResumen(){
               <div style="font-size:11px;color:var(--muted);margin-bottom:3px">CMO promedio</div>
               <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--warn)">${Math.round(cmoYest/1000).toLocaleString('es-AR')} <span style="font-size:11px;font-weight:400;color:var(--muted)">k$/MWh</span></div>
             </div>`:''}
-            ${(()=>{const spotMes=SPOT_DATA[MONTH]||[];const spotVals=spotMes.map(r=>r.spot);const spotAvg=spotVals.length?spotVals.reduce((a,b)=>a+b,0)/spotVals.length:null;return spotAvg!=null?`<div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">SPOT promedio mes</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--amber)">${fmtN(spotAvg,2)} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div></div>`:'';})()}
+            ${(()=>{const spotMes=SPOT_DATA[MONTH]||[];const spotVals=spotMes.map(r=>r.spot);const spotAvg=spotVals.length?spotVals.reduce((a,b)=>a+b,0)/spotVals.length:null;return spotAvg!=null?`<div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">SPOT promedio mes</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--amber)">${fmtN(spotAvg,2)} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div><div style="font-size:10px;color:var(--muted)">${spotVals.length} día${spotVals.length!==1?'s':''} promediados</div></div>`:'';})()}
         </div>`;
     }
   }
@@ -1815,7 +1815,7 @@ function _renderResumenUSD(){
             <div style="font-size:11px;color:var(--muted);margin-bottom:3px">CMO promedio</div>
             <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--warn)">${(cmoYest/tc).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div>
           </div>`:''}
-          ${(()=>{const spotMes=SPOT_DATA[MONTH]||[];const spotVals=spotMes.map(r=>r.spot);const spotAvg=spotVals.length?spotVals.reduce((a,b)=>a+b,0)/spotVals.length:null;return spotAvg!=null?`<div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">SPOT promedio mes</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--amber)">${fmtN(spotAvg,2)} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div></div>`:'';})()}
+          ${(()=>{const spotMes=SPOT_DATA[MONTH]||[];const spotVals=spotMes.map(r=>r.spot);const spotAvg=spotVals.length?spotVals.reduce((a,b)=>a+b,0)/spotVals.length:null;return spotAvg!=null?`<div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">SPOT promedio mes</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--amber)">${fmtN(spotAvg,2)} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div><div style="font-size:10px;color:var(--muted)">${spotVals.length} día${spotVals.length!==1?'s':''} promediados</div></div>`:'';})()}
         </div>
       </div>`;
   }
@@ -2222,156 +2222,193 @@ function buildSpotPrice(){
 function buildIndisp(){
   const el=document.getElementById('indisp-content');
   if(!el)return;
-  const tc=getTC();
+  const tc=getTC(); const kp=getKP();
+  const FRA=0.15; const RMIN_LO=2; const RMIN_HI=7; const RMIN_THR=60;
+  // CC partners: TG23↔TV11, TG22↔TV12
+  const CC={'TG23':'TV11','TV11':'TG23','TG22':'TV12','TV12':'TG22'};
+  const GRP={'TG23':['TG22'],'TG22':['TG23'],'TV11':['TV12'],'TV12':['TV11']};
+  // Global POT_NOM fallback (max across all loaded months)
+  const POT_NOM_GLOBAL={TG23:24.77,TG22:24.98,TV11:11.81,TV12:11.10};
+
+  // Helper: get CVP (comb,transp,oym) for machine m at date d hour h
+  // Priority: own → CC partner → group → null (caller uses proxy)
+  function getCVP(m,d,h){
+    const getH=(key)=>{
+      const r=getRows(key).find(x=>x.fecha===d);
+      if(!r) return 0;
+      return (r.h?r.h[h]:null)??r.avg??0;
+    };
+    let c=getH(COMBKEYS[m]), t=getH(TRANSPKEYS[m]), o=getH(OYMKEYS[m]);
+    if(c+t+o>0) return {c,t,o};
+    // CC partner
+    const cp=CC[m];
+    c=getH(COMBKEYS[cp]); t=getH(TRANSPKEYS[cp]); o=getH(OYMKEYS[cp]);
+    if(c+t+o>0) return {c,t,o};
+    // Group partner
+    for(const gp of (GRP[m]||[])){
+      c=getH(COMBKEYS[gp]); t=getH(TRANSPKEYS[gp]); o=getH(OYMKEYS[gp]);
+      if(c+t+o>0) return {c,t,o};
+    }
+    return null; // no data — will use monthly avg proxy
+  }
+
+  // Compute monthly avg CVP per machine (from operational hours) as proxy
+  function avgCVP(m){
+    let sc=0,st=0,so=0,n=0;
+    getRows(EKEYS[m]).forEach(er=>{
+      const cr=getRows(COMBKEYS[m]).find(x=>x.fecha===er.fecha);
+      const tr=getRows(TRANSPKEYS[m]).find(x=>x.fecha===er.fecha);
+      const or2=getRows(OYMKEYS[m]).find(x=>x.fecha===er.fecha);
+      const eh=er.h||Array(24).fill(er.avg||0);
+      for(let h=0;h<24;h++){
+        const e=eh[h]||0; if(!e) continue;
+        const getHv=(row)=>{if(!row)return 0;return (row.h?row.h[h]:null)??row.avg??0;};
+        sc+=getHv(cr); st+=getHv(tr); so+=getHv(or2); n++;
+      }
+    });
+    return n>0?{c:sc/n,t:st/n,o:so/n}:{c:0,t:0,o:0};
+  }
+
+  // Get POT_NOM for this month (max in POT_DISP), fallback to global
+  function getPotNom(m){
+    let mx=0;
+    getRows('AVAL'+m+'-POT_DISP').forEach(r=>{
+      (r.h||[r.avg]).forEach(v=>{if(v&&v>mx)mx=v;});
+    });
+    return mx>0?mx:POT_NOM_GLOBAL[m];
+  }
+
+  // Dates with any data
+  const dates=allDates(Object.values(EKEYS));
+  const cmoRows=getRows('PRECIOS-CMO');
+  const ppadRows=getRows('PRECIOS-PPAD');
+
+  // Pre-compute monthly avg CVP proxies
+  const PROXY={};
+  MKEYS.forEach(m=>{ PROXY[m]=avgCVP(m); });
+
+  // Per-machine accumulators
+  const acc={};
+  MKEYS.forEach(m=>{ acc[m]={hs:0,hsCmo:0,e:0,rem:0,gas:0,mwhrp:0,remPot:0}; });
+
+  const potNom={};
+  MKEYS.forEach(m=>{ potNom[m]=getPotNom(m); });
+
+  dates.forEach(fecha=>{
+    const cmoRow=cmoRows.find(x=>x.fecha===fecha);
+    const ppadRow=ppadRows.find(x=>x.fecha===fecha);
+    for(let h=0;h<24;h++){
+      const cmo=(cmoRow?.h?cmoRow.h[h]:null)??cmoRow?.avg??0;
+      const ppad=(ppadRow?.h?ppadRow.h[h]:null)??ppadRow?.avg??0;
+      MKEYS.forEach(m=>{
+        const estRow=getRows(ESTKEYS[m]).find(x=>x.fecha===fecha);
+        const est=(estRow?.h?estRow.h[h]:null)??'';
+        if(est!=='i-i'&&est!=='lib') return;
+        const fpRow=getRows(FPKEYS[m]).find(x=>x.fecha===fecha);
+        const fp=(fpRow?.h?fpRow.h[h]:null)??fpRow?.avg??1;
+        acc[m].hs++;
+        // CVP for this hour
+        let cvpD=getCVP(m,fecha,h);
+        if(!cvpD) cvpD=PROXY[m];
+        const {c,t,o}=cvpD; const cvp=c+t+o;
+        // Energy: only if CMO*FP > CVP
+        if(cmo*fp>cvp && potNom[m]>0){
+          acc[m].hsCmo++;
+          const e=potNom[m];
+          const rmin=(cvp/tc<RMIN_THR?RMIN_LO:RMIN_HI)*tc;
+          const rem=cvp+Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*0.8);
+          acc[m].e+=e; acc[m].rem+=rem*e; acc[m].gas+=(c+t)*e;
+        }
+        // Potencia: all HRP hours
+        if(ppad>0 && potNom[m]>0){
+          acc[m].mwhrp+=potNom[m]; acc[m].remPot+=potNom[m]*kp*ppad*tc;
+        }
+      });
+    }
+  });
+
   const METODOLOGIA=`<div style="background:var(--surface2);border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Metodología del cálculo</div>
-    <b>Energía adicional:</b> Solo en horas i-i/lib donde CMO×FP &gt; CVP (hubiera convenido despachar). Potencia generada = POT_NOM de cada máquina (máximo mensual; si la máquina no generó en el mes, se usa el máximo histórico de todos los meses). Remuneración = misma fórmula que el cálculo real: CVP + MAX(RMIN ; (CMO×FP − CVP) × FRA × FRC). Costo gas = (CVP_Comb + CVP_Transp) × E.<br>
-    <b>CVP en horas i-i:</b> Se busca en orden: (1) hoja propia de la máquina · (2) partner del ciclo combinado (TG23↔TV11, TG22↔TV12) · (3) otra máquina del mismo grupo · (4) CVP promedio mensual como proxy.<br>
-    <b>Potencia adicional:</b> En todas las horas HRP (PPAD &gt; 0), sin filtro de CMO. Rem. Potencia = POT_NOM × KP × PPAD × TC.<br>
-    <b>Total:</b> Renta E (Rem E − Gas) + Rem. Potencia.
+    <b>Energía adicional:</b> Solo en horas i-i/lib donde CMO×FP &gt; CVP. Potencia = POT_NOM del mes (máx histórico si no generó). Rem = CVP + MAX(RMIN; (CMO×FP−CVP)×FRA×FRC). Gas = (Comb+Transp)×E.<br>
+    <b>CVP en i-i:</b> (1) hoja propia · (2) partner CC (TG23↔TV11, TG22↔TV12) · (3) grupo · (4) promedio mensual proxy.<br>
+    <b>Potencia:</b> Todas las horas HRP (PPAD&gt;0). Rem = POT_NOM×KP×PPAD×TC.<br>
+    <b>Total:</b> Renta E (Rem−Gas) + Rem. Pot. — Calculado dinámicamente del mes seleccionado.
   </div>`;
 
-  // Pre-calculated results per month (from Python analysis)
-  const INDISP_DATA={
-    '2026_01':{TC:1299.9999,KP:0.9,
-      maq:{TG23:{hs:469,e:4070,rem:239534406,gas:225172750,mwhrp:5390,rem_pot:75675594},
-           TG22:{hs:744,e:9417,rem:613841256,gas:514730072,mwhrp:9642,rem_pot:135377601},
-           TV11:{hs:470,e:1961,rem:115412032,gas:108492325,mwhrp:2608,rem_pot:36610701},
-           TV12:{hs:744,e:4318,rem:280484787,gas:236092420,mwhrp:4285,rem_pot:60155779}}},
-    '2026_02':{TC:1408.966,KP:0.9,
-      maq:{TG23:{hs:24,e:0,rem:0,gas:0,mwhrp:133,rem_pot:2019487},
-           TG22:{hs:351,e:4321,rem:303852829,gas:247523876,mwhrp:3548,rem_pot:53993675},
-           TV11:{hs:24,e:0,rem:0,gas:0,mwhrp:66,rem_pot:1004311},
-           TV12:{hs:354,e:1830,rem:128701273,gas:104842328,mwhrp:1534,rem_pot:23336535}}},
-    '2026_03':{TC:1382.757,KP:0.9,
-      maq:{TG23:{hs:81,e:269,rem:18761406,gas:18018766,mwhrp:313,rem_pot:4678632},
-           TG22:{hs:514,e:5558,rem:359483833,gas:265495188,mwhrp:5212,rem_pot:77841768},
-           TV11:{hs:81,e:137,rem:9557602,gas:9179280,mwhrp:160,rem_pot:2383431},
-           TV12:{hs:524,e:2650,rem:173528579,gas:128474102,mwhrp:2491,rem_pot:37200035}}},
-    '2026_04':{TC:1381.0954,KP:0.9,
-      maq:{TG23:{hs:289,e:1999,rem:168117935,gas:137847736,mwhrp:3389,rem_pot:50549137},
-           TG22:{hs:514,e:5923,rem:434452932,gas:322828069,mwhrp:5801,rem_pot:86530461},
-           TV11:{hs:342,e:3449,rem:209803137,gas:174243509,mwhrp:2031,rem_pot:30301390},
-           TV12:{hs:626,e:5717,rem:377625981,gas:292320667,mwhrp:3430,rem_pot:51159806}}},
-    '2026_05':{TC:1410.29,KP:0.9,
-      maq:{TG23:{hs:79,e:1090,rem:144657376,gas:132447150,mwhrp:372,rem_pot:5660269},
-           TG22:{hs:159,e:3123,rem:335668725,gas:279630277,mwhrp:1324,rem_pot:20165105},
-           TV11:{hs:162,e:1440,rem:161799831,gas:138615511,mwhrp:850,rem_pot:12940370},
-           TV12:{hs:493,e:4938,rem:659899590,gas:555223145,mwhrp:2728,rem_pot:41556042}}},
-    '2026_06':{TC:1442.41,KP:1.1,
-      maq:{TG23:{hs:68,e:1685,rem:194444268,gas:147396571,mwhrp:1090,rem_pot:20755299},
-           TG22:{hs:169,e:3722,rem:420064385,gas:306650795,mwhrp:2148,rem_pot:40902847},
-           TV11:{hs:69,e:787,rem:80036806,gas:58609720,mwhrp:513,rem_pot:9772564},
-           TV12:{hs:453,e:4328,rem:543534964,gas:416813247,mwhrp:2283,rem_pot:43462350}}},
-  };
+  // KPI totals
+  const totHs=MKEYS.reduce((s,m)=>s+acc[m].hs,0);
+  const totE=MKEYS.reduce((s,m)=>s+acc[m].e,0);
+  const totRemE=MKEYS.reduce((s,m)=>s+acc[m].rem,0);
+  const totGas=MKEYS.reduce((s,m)=>s+acc[m].gas,0);
+  const totRentaE=(totRemE-totGas)/tc;
+  const totRemPot=MKEYS.reduce((s,m)=>s+acc[m].remPot,0)/tc;
+  const totTotal=totRentaE+totRemPot;
+  const fmtU=v=>Math.round(v).toLocaleString('es-AR');
 
-  const MKEYS=['TG23','TG22','TV11','TV12'];
-  const fmtU=v=>v.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
-  const fmtK=v=>(v/1000).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'K';
-
-  // Use current month if available, else show all
-  const curKey=`${MONTH.split('_')[0]}_${MONTH.split('_')[1]}`;
-  const months=Object.keys(INDISP_DATA).filter(k=>INDISP_DATA[k]);
-
-  let html='';
-
-  // Summary KPIs across all months
-  let totalRenta=0,totalPot=0,totalE=0,totalHs=0;
-  months.forEach(k=>{
-    const d=INDISP_DATA[k];
-    MKEYS.forEach(m=>{
-      const v=d.maq[m];
-      totalRenta+=(v.rem-v.gas); totalPot+=v.rem_pot; totalE+=v.e; totalHs+=v.hs;
-    });
-  });
-  // Grand totals across all months
-  // Use TC from MONTH_CFG (updated from config.json) when available, fallback to hardcoded
-  const getIndispTC=(k)=>TC_CACHE[k]?.tc||MONTH_CFG[k]?.TC||INDISP_DATA[k].TC;
-  const grandRentaE=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+(d.maq[m].rem-d.maq[m].gas),0)/tc;},0);
-  const grandRemPot=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].rem_pot,0)/tc;},0);
-  const grandTotal=grandRentaE+grandRemPot;
-  const grandRemE=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].rem,0)/tc;},0);
-  const grandGas=months.reduce((s,k)=>{const d=INDISP_DATA[k];const tc=getIndispTC(k);return s+MKEYS.reduce((ss,m)=>ss+d.maq[m].gas,0)/tc;},0);
-
-  html+=`<div class="kr" style="margin-bottom:18px">
-    <div class="kpi"><div class="kpi-lbl">Total hs indisp.</div><div class="kpi-val w">${fmtU(totalHs)}</div><div class="kpi-unit">h·máquina · ene-jun 2026</div></div>
-    <div class="kpi"><div class="kpi-lbl">Energía potencial adicional</div><div class="kpi-val a">${fmtU(totalE)}</div><div class="kpi-unit">MWh acumulado</div></div>
-    <div class="kpi"><div class="kpi-lbl">Renta E adicional</div><div class="kpi-val s">USD ${fmtU(Math.round(grandRentaE))}</div><div class="kpi-unit">acumulado</div></div>
-    <div class="kpi"><div class="kpi-lbl">Rem. potencia adicional</div><div class="kpi-val d">USD ${fmtU(Math.round(grandRemPot))}</div><div class="kpi-unit">acumulado</div></div>
-    <div class="kpi" style="border-color:rgba(79,142,247,.5)"><div class="kpi-lbl">Remuneración total perdida</div><div class="kpi-val" style="color:var(--accent);font-size:22px">USD ${fmtU(Math.round(grandTotal))}</div><div class="kpi-unit">Renta E + Rem. Pot. · ene-jun 2026</div></div>
+  const kpiHtml=`<div class="kr" style="margin-bottom:18px">
+    <div class="kpi"><div class="kpi-lbl">Hs indisp. (i-i/lib)</div><div class="kpi-val w">${fmtU(totHs)}</div><div class="kpi-unit">h·máquina en el mes</div></div>
+    <div class="kpi"><div class="kpi-lbl">Energía potencial</div><div class="kpi-val a">${fmtU(Math.round(totE))}</div><div class="kpi-unit">MWh (horas CMO&gt;CVP)</div></div>
+    <div class="kpi"><div class="kpi-lbl">Renta E adicional</div><div class="kpi-val s">USD ${fmtU(totRentaE)}</div><div class="kpi-unit">Rem − Gas</div></div>
+    <div class="kpi"><div class="kpi-lbl">Rem. Potencia adicional</div><div class="kpi-val d">USD ${fmtU(totRemPot)}</div><div class="kpi-unit">HRP hours</div></div>
+    <div class="kpi" style="border-color:rgba(79,142,247,.5)"><div class="kpi-lbl">Renta total perdida</div><div class="kpi-val" style="color:var(--accent);font-size:22px">USD ${fmtU(totTotal)}</div><div class="kpi-unit">Renta E + Rem. Pot.</div></div>
   </div>`;
 
-  // Table per month
-  months.forEach(k=>{
-    const d=INDISP_DATA[k]; const TC=TC_CACHE[k]?.tc||MONTH_CFG[k]?.TC||d.TC;
-    const [yr,mm]=k.split('_');
-    const mesNombre=['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][parseInt(mm)];
-    const totE=MKEYS.reduce((s,m)=>s+d.maq[m].e,0);
-    const totRem=MKEYS.reduce((s,m)=>s+d.maq[m].rem,0);
-    const totGas=MKEYS.reduce((s,m)=>s+d.maq[m].gas,0);
-    const totPot=MKEYS.reduce((s,m)=>s+d.maq[m].rem_pot,0);
-    const totMW=MKEYS.reduce((s,m)=>s+d.maq[m].mwhrp,0);
-    const totRenta=totRem-totGas;
-    const totTotal=totRenta+totPot;
+  // Per-machine table
+  const hdrs=`<tr style="border-bottom:2px solid var(--border2)">
+    <th style="padding:5px 10px;color:var(--muted);font-weight:500;text-align:left">Máquina</th>
+    <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Pot. nom.</th>
+    <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Hs indisp.</th>
+    <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Hs CMO&gt;CVP</th>
+    <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">E (MWh)</th>
+    <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Rem E ($)</th>
+    <th style="padding:5px 8px;color:var(--danger);font-weight:500;text-align:right">Gas ($)</th>
+    <th style="padding:5px 8px;color:var(--success);font-weight:500;text-align:right">Renta E ($)</th>
+    <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">MW·hrp</th>
+    <th style="padding:5px 8px;color:var(--success);font-weight:500;text-align:right">Rem Pot ($)</th>
+    <th style="padding:5px 8px;color:var(--accent);font-weight:500;text-align:right">Renta E+Pot (USD)</th>
+  </tr>`;
 
-    html+=`<div class="card" style="margin-bottom:16px;padding:18px 22px">
-      <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:14px;flex-wrap:wrap">
-        <div style="font-size:14px;font-weight:700;color:var(--text)">${mesNombre} ${yr}</div>
-        <div style="font-size:12px;color:var(--muted)">TC ${TC.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})} $/USD · KP ${d.KP}</div>
-        <div style="margin-left:auto;font-size:13px;font-weight:600;color:var(--success)">Impacto total: USD ${fmtU(Math.round(totTotal/TC))}</div>
-      </div>
-      <div style="overflow-x:auto">
-        <table style="border-collapse:collapse;font-size:12px;width:100%">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border2)">
-              <th style="text-align:left;padding:5px 8px;color:var(--muted);font-weight:500">Máquina</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">Hs indisp.</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">E (MWh)</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">Rem E ($)</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--danger);font-weight:500">Gas ($)</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--success);font-weight:500">Renta E ($)</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--muted);font-weight:500">MW·hrp</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--success);font-weight:500">Rem Pot ($)</th>
-              <th style="text-align:right;padding:5px 8px;color:var(--accent);font-weight:500">Renta E + Rem Pot (USD)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${MKEYS.map((m,i)=>{
-              const v=d.maq[m];
-              const renta=v.rem-v.gas;
-              const tot=(renta+v.rem_pot)/TC;
-              return `<tr style="${i%2?'background:var(--surface2)':''}">
-                <td style="padding:6px 8px;font-weight:600;color:${CL[i]}">${m}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--muted)">${v.hs}</td>
-                <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(v.e))}</td>
-                <td style="text-align:right;padding:6px 8px">$${fmtM(v.rem)}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--danger)">$${fmtM(v.gas)}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:500">$${fmtM(renta)}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(v.mwhrp))}</td>
-                <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtM(v.rem_pot)}</td>
-                <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${v.hs>0?'$'+fmtM(renta+v.rem_pot)+'<br><span style="font-size:11px;color:var(--teal)">USD '+fmtU(Math.round(tot))+'</span>':'-'}</td>
-              </tr>`;
-            }).join('')}
-            <tr style="border-top:1px solid var(--border2);font-weight:600">
-              <td style="padding:6px 8px;color:var(--muted)">TOTAL</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--muted)">${MKEYS.reduce((s,m)=>s+d.maq[m].hs,0)}</td>
-              <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(totE))}</td>
-              <td style="text-align:right;padding:6px 8px">$${fmtM(totRem)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--danger)">$${fmtM(totGas)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtM(totRenta)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(totMW))}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--success)">$${fmtM(totPot)}</td>
-              <td style="text-align:right;padding:6px 8px;color:var(--accent)">$${fmtM(totRenta+totPot)}<br><span style="font-size:11px;color:var(--teal)">USD ${fmtU(Math.round(totTotal/TC))}</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>`;
-  });
+  const rows2=MKEYS.map((m,i)=>{
+    const a=acc[m]; const renta=a.rem-a.gas; const tot=(renta+a.remPot)/tc;
+    return `<tr style="${i%2?'background:var(--surface2)':''}">
+      <td style="padding:6px 10px;font-weight:600;color:${CL[i]}">${m}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--muted)">${potNom[m].toFixed(1)} MW</td>
+      <td style="text-align:right;padding:6px 8px">${a.hs}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--muted)">${a.hsCmo}</td>
+      <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(a.e))}</td>
+      <td style="text-align:right;padding:6px 8px">${fmtM(a.rem)}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--danger)">${fmtM(a.gas)}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:500">${fmtM(renta)}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(a.mwhrp))}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--success)">${fmtM(a.remPot)}</td>
+      <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${a.hs>0?'$'+fmtM(renta+a.remPot)+'<br><span style="font-size:11px;color:var(--teal)">USD '+fmtU(Math.round(tot))+'</span>':'-'}</td>
+    </tr>`;
+  }).join('');
 
-  el.innerHTML=METODOLOGIA+html;
+  const totRenta=MKEYS.reduce((s,m)=>s+(acc[m].rem-acc[m].gas),0);
+  const totRentaPot=MKEYS.reduce((s,m)=>s+acc[m].remPot,0);
+  const totRow=`<tr style="border-top:2px solid var(--border2);font-weight:600">
+    <td style="padding:6px 10px;color:var(--muted)">TOTAL</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--muted)">—</td>
+    <td style="text-align:right;padding:6px 8px">${fmtU(totHs)}</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--muted)">${MKEYS.reduce((s,m)=>s+acc[m].hsCmo,0)}</td>
+    <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(totE))}</td>
+    <td style="text-align:right;padding:6px 8px">${fmtM(totRemE)}</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--danger)">${fmtM(totGas)}</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--success)">${fmtM(totRenta)}</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(MKEYS.reduce((s,m)=>s+acc[m].mwhrp,0)))}</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--success)">${fmtM(totRentaPot)}</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--accent)">$${fmtM(totRenta+totRentaPot)}<br><span style="font-size:11px;color:var(--teal)">USD ${fmtU(Math.round(totTotal))}</span></td>
+  </tr>`;
+
+  const tableHtml=`<div class="card" style="padding:20px 24px;overflow-x:auto">
+    <table style="border-collapse:collapse;font-size:12px;width:100%">
+      <thead>${hdrs}</thead><tbody>${rows2}${totRow}</tbody>
+    </table>
+  </div>`;
+
+  el.innerHTML=METODOLOGIA+kpiHtml+tableHtml;
 }
-
 function buildCvpTotal(){
   const {cvp}=getComputedTotals();
   const totalMes=cvp.combTotal+cvp.transpTotal+cvp.oymTotal;
@@ -3267,7 +3304,7 @@ function buildEstOperativo(){
 //   2. localStorage — fast runtime cache, fallback if repo config not found
 const PERSIST_KEY = 'ctaval_cfg_v1';
 const CONFIG_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/config.json';
-const SPOT_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/resumen_precios_previstos.xlsx';
+const SPOT_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/resumen_precios_previstos_xlsx.xlsx';
 let SPOT_DATA = {}; // {YYYY_MM: [{fecha, spot}]}
 
 function savePrefs() {
