@@ -3420,7 +3420,7 @@ window.showSec=showSec;window.setETab=setETab;window.setRemTab=setRemTab;window.
 // Bootstrap: run loader then init
 (async () => {
   try {
-    const loaded = await Promise.all([loadAllData(), loadSpotData()]);
+    const loaded = await loadAllData(); loadSpotData().catch(e=>console.warn('SPOT error:',e));
     if (loaded) initDashboard(loaded);
   } catch(e) {
     document.getElementById('load-status').textContent = '❌ Error: ' + e.message;
