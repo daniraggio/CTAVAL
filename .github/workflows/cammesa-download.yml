@@ -2,8 +2,8 @@ name: Descargar Resumen Precios Previstos (CAMMESA)
 
 on:
   schedule:
-    # 09:00 hora Argentina (UTC-3) = 12:00 UTC, todos los días
-    - cron: '0 12 * * *'
+    # 05:00 hora Argentina (UTC-3) = 12:00 UTC, todos los días
+    - cron: '0 5 * * *'
   workflow_dispatch: {}   # permite disparo manual desde la pestaña Actions
 
 jobs:
