@@ -2226,7 +2226,7 @@ function buildIndisp(){
   const FRA=0.15; const RMIN_LO=2; const RMIN_HI=7; const RMIN_THR=60;
   const CC={'TG23':'TV11','TV11':'TG23','TG22':'TV12','TV12':'TG22'};
   const GRP={'TG23':['TG22'],'TG22':['TG23'],'TV11':['TV12'],'TV12':['TV11']};
-  const POT_NOM_GLOBAL={TG23:24.77,TG22:24.98,TV11:11.81,TV12:11.10};
+  const POT_NOM_GLOBAL={TG23:24.0,TG22:24.0,TV11:11.0,TV12:11.0};
 
   function getHv(rows,key,d,h){
     const r=rows[key]?.find?.(x=>x.fecha===d)||null;
@@ -2257,13 +2257,24 @@ function buildIndisp(){
   function getCVP2(m,d,h){
     const c=gv(COMBKEYS[m],d,h), t=gv(TRANSPKEYS[m],d,h), o=gv(OYMKEYS[m],d,h);
     if(c+t+o>0) return {c,t,o};
+    // CC partner (TG23↔TV11, TG22↔TV12)
     const cp=CC[m];
     const cc=gv(COMBKEYS[cp],d,h), ct=gv(TRANSPKEYS[cp],d,h), co=gv(OYMKEYS[cp],d,h);
     if(cc+ct+co>0) return {c:cc,t:ct,o:co};
+    // Group partner (TG23↔TG22, TV11↔TV12) — use hourly first, then monthly avg
     for(const gp of (GRP[m]||[])){
       const gc=gv(COMBKEYS[gp],d,h), gt=gv(TRANSPKEYS[gp],d,h), go=gv(OYMKEYS[gp],d,h);
       if(gc+gt+go>0) return {c:gc,t:gt,o:go};
+      // If no hourly data, use monthly avg of the group partner
+      const pa=PROXY[gp];
+      if(pa&&(pa.c+pa.t+pa.o)>0) return {c:pa.c,t:pa.t,o:pa.o};
     }
+    // CC partner monthly avg
+    const cpa=PROXY[cp];
+    if(cpa&&(cpa.c+cpa.t+cpa.o)>0) return {c:cpa.c,t:cpa.t,o:cpa.o};
+    // Own monthly avg
+    const pa=PROXY[m];
+    if(pa&&(pa.c+pa.t+pa.o)>0) return {c:pa.c,t:pa.t,o:pa.o};
     return null;
   }
 
@@ -2317,7 +2328,7 @@ function buildIndisp(){
         if(!cvpD) cvpD=PROXY[m];
         const {c,t,o}=cvpD; const cvp=c+t+o;
         // Energy: only if CMO*FP > CVP
-        if(cmo*fp>cvp && potNom[m]>0){
+        if(cmo*fp>cvp && cvp>0 && potNom[m]>0){
           acc[m].hsCmo++;
           const e=potNom[m];
           const rmin=(cvp/tc<RMIN_THR?RMIN_LO:RMIN_HI)*tc;
@@ -2338,7 +2349,8 @@ function buildIndisp(){
 
   const METODOLOGIA=`<div style="background:var(--surface2);border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Metodología del cálculo</div>
-    <b>Renta marginal perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP: Rem = (CVP + MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)) × E · Gas = (Comb+Transp) × E · Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E.<br>
+    <b>Renta perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP (y CVP &gt; 0): Rem = (CVP + MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)) × E · Gas = (Comb+Transp) × E · Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E. Si no hay CVP disponible (máquina sin datos en el mes) no se calcula energía.<br>
+    <b>Potencia nominal:</b> TG = 24 MW · TV = 11 MW (fijo).<br>
     <b>CVP en horas i-i:</b> (1) hoja propia · (2) partner CC (TG23↔TV11, TG22↔TV12) · (3) grupo · (4) promedio mensual proxy.<br>
     <b>Potencia:</b> Rem. Pot. = POT_NOM × KP × PPAD × TC en todas las horas HRP (PPAD&gt;0).<br>
     <b>Total perdido:</b> Renta marginal E + Rem. Pot.
