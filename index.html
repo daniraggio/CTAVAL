@@ -2295,11 +2295,8 @@ function buildIndisp(){
   }
 
   function getPotNom(m){
-    let mx=0;
-    getRows('AVAL'+m+'-POT_DISP').forEach(r=>{
-      (r.h||[r.avg||0]).forEach(v=>{if(v&&v>mx)mx=v;});
-    });
-    return mx>0?mx:POT_NOM_GLOBAL[m];
+    // Fixed nominal power: TG=24MW, TV=11MW
+    return POT_NOM_GLOBAL[m];
   }
 
   const dates=allDates(Object.values(EKEYS));
