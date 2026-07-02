@@ -2321,9 +2321,12 @@ function buildIndisp(){
           acc[m].hsCmo++;
           const e=potNom[m];
           const rmin=(cvp/tc<RMIN_THR?RMIN_LO:RMIN_HI)*tc;
-          // Solo la renta marginal perdida (no el CVP — es costo de producción)
-          const renta=Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*0.8);
-          acc[m].e+=e; acc[m].renta+=renta*e;
+          // Rem = (CVP + MAX(RMIN; (CMO×FP−CVP)×FRA×FRC)) × E
+          // Gas = (Comb+Transp) × E
+          // Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E
+          const renta_marg=Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*0.8);
+          const renta=o*e + renta_marg*e;  // OyM×E + renta_marginal×E
+          acc[m].e+=e; acc[m].renta+=renta;
         }
         // Potencia: all HRP hours
         if(ppad>0 && potNom[m]>0){
@@ -2335,7 +2338,7 @@ function buildIndisp(){
 
   const METODOLOGIA=`<div style="background:var(--surface2);border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Metodología del cálculo</div>
-    <b>Renta marginal perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP, la renta que no se cobró = MAX(RMIN ; (CMO×FP − CVP) × FRA × FRC) × E. No incluye CVP (es costo de producción — no se pierde al estar indisponible).<br>
+    <b>Renta marginal perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP: Rem = (CVP + MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)) × E · Gas = (Comb+Transp) × E · Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E.<br>
     <b>CVP en horas i-i:</b> (1) hoja propia · (2) partner CC (TG23↔TV11, TG22↔TV12) · (3) grupo · (4) promedio mensual proxy.<br>
     <b>Potencia:</b> Rem. Pot. = POT_NOM × KP × PPAD × TC en todas las horas HRP (PPAD&gt;0).<br>
     <b>Total perdido:</b> Renta marginal E + Rem. Pot.
