@@ -2224,82 +2224,88 @@ function buildIndisp(){
   if(!el)return;
   const tc=getTC(); const kp=getKP();
   const FRA=0.15; const RMIN_LO=2; const RMIN_HI=7; const RMIN_THR=60;
-  // CC partners: TG23↔TV11, TG22↔TV12
   const CC={'TG23':'TV11','TV11':'TG23','TG22':'TV12','TV12':'TG22'};
   const GRP={'TG23':['TG22'],'TG22':['TG23'],'TV11':['TV12'],'TV12':['TV11']};
-  // Global POT_NOM fallback (max across all loaded months)
   const POT_NOM_GLOBAL={TG23:24.77,TG22:24.98,TV11:11.81,TV12:11.10};
 
-  // Helper: get CVP (comb,transp,oym) for machine m at date d hour h
-  // Priority: own → CC partner → group → null (caller uses proxy)
-  function getCVP(m,d,h){
-    const getH=(key)=>{
-      const r=getRows(key).find(x=>x.fecha===d);
-      if(!r) return 0;
-      return (r.h?r.h[h]:null)??r.avg??0;
-    };
-    let c=getH(COMBKEYS[m]), t=getH(TRANSPKEYS[m]), o=getH(OYMKEYS[m]);
-    if(c+t+o>0) return {c,t,o};
-    // CC partner
-    const cp=CC[m];
-    c=getH(COMBKEYS[cp]); t=getH(TRANSPKEYS[cp]); o=getH(OYMKEYS[cp]);
-    if(c+t+o>0) return {c,t,o};
-    // Group partner
-    for(const gp of (GRP[m]||[])){
-      c=getH(COMBKEYS[gp]); t=getH(TRANSPKEYS[gp]); o=getH(OYMKEYS[gp]);
-      if(c+t+o>0) return {c,t,o};
-    }
-    return null; // no data — will use monthly avg proxy
+  function getHv(rows,key,d,h){
+    const r=rows[key]?.find?.(x=>x.fecha===d)||null;
+    if(!r) return 0;
+    return (r.h?r.h[h]:null)??r.avg??0;
   }
 
-  // Compute monthly avg CVP per machine (from operational hours) as proxy
+  function getCVP(m,d,h){
+    const c=getHv(null,COMBKEYS[m],d,h), t=getHv(null,TRANSPKEYS[m],d,h), o=getHv(null,OYMKEYS[m],d,h);
+    if(c+t+o>0) return {c,t,o};
+    const cp=CC[m];
+    const cc=getHv(null,COMBKEYS[cp],d,h), ct=getHv(null,TRANSPKEYS[cp],d,h), co=getHv(null,OYMKEYS[cp],d,h);
+    if(cc+ct+co>0) return {c:cc,t:ct,o:co};
+    for(const gp of (GRP[m]||[])){
+      const gc=getHv(null,COMBKEYS[gp],d,h), gt=getHv(null,TRANSPKEYS[gp],d,h), go=getHv(null,OYMKEYS[gp],d,h);
+      if(gc+gt+go>0) return {c:gc,t:gt,o:go};
+    }
+    return null;
+  }
+
+  // helper: get value from loaded sheet rows
+  function gv(sheetKey,d,h){
+    const r=getRows(sheetKey).find(x=>x.fecha===d);
+    if(!r) return 0;
+    return (r.h?r.h[h]:null)??r.avg??0;
+  }
+
+  function getCVP2(m,d,h){
+    const c=gv(COMBKEYS[m],d,h), t=gv(TRANSPKEYS[m],d,h), o=gv(OYMKEYS[m],d,h);
+    if(c+t+o>0) return {c,t,o};
+    const cp=CC[m];
+    const cc=gv(COMBKEYS[cp],d,h), ct=gv(TRANSPKEYS[cp],d,h), co=gv(OYMKEYS[cp],d,h);
+    if(cc+ct+co>0) return {c:cc,t:ct,o:co};
+    for(const gp of (GRP[m]||[])){
+      const gc=gv(COMBKEYS[gp],d,h), gt=gv(TRANSPKEYS[gp],d,h), go=gv(OYMKEYS[gp],d,h);
+      if(gc+gt+go>0) return {c:gc,t:gt,o:go};
+    }
+    return null;
+  }
+
+  // Monthly avg CVP proxy (from operational hours)
   function avgCVP(m){
     let sc=0,st=0,so=0,n=0;
     getRows(EKEYS[m]).forEach(er=>{
-      const cr=getRows(COMBKEYS[m]).find(x=>x.fecha===er.fecha);
-      const tr=getRows(TRANSPKEYS[m]).find(x=>x.fecha===er.fecha);
-      const or2=getRows(OYMKEYS[m]).find(x=>x.fecha===er.fecha);
       const eh=er.h||Array(24).fill(er.avg||0);
       for(let h=0;h<24;h++){
         const e=eh[h]||0; if(!e) continue;
-        const getHv=(row)=>{if(!row)return 0;return (row.h?row.h[h]:null)??row.avg??0;};
-        sc+=getHv(cr); st+=getHv(tr); so+=getHv(or2); n++;
+        sc+=gv(COMBKEYS[m],er.fecha,h);
+        st+=gv(TRANSPKEYS[m],er.fecha,h);
+        so+=gv(OYMKEYS[m],er.fecha,h);
+        n++;
       }
     });
     return n>0?{c:sc/n,t:st/n,o:so/n}:{c:0,t:0,o:0};
   }
 
-  // Get POT_NOM for this month (max in POT_DISP), fallback to global
   function getPotNom(m){
     let mx=0;
     getRows('AVAL'+m+'-POT_DISP').forEach(r=>{
-      (r.h||[r.avg]).forEach(v=>{if(v&&v>mx)mx=v;});
+      (r.h||[r.avg||0]).forEach(v=>{if(v&&v>mx)mx=v;});
     });
     return mx>0?mx:POT_NOM_GLOBAL[m];
   }
 
-  // Dates with any data
   const dates=allDates(Object.values(EKEYS));
   const cmoRows=getRows('PRECIOS-CMO');
   const ppadRows=getRows('PRECIOS-PPAD');
+  const PROXY={}; MKEYS.forEach(m=>{PROXY[m]=avgCVP(m);});
+  const potNom={}; MKEYS.forEach(m=>{potNom[m]=getPotNom(m);});
 
-  // Pre-compute monthly avg CVP proxies
-  const PROXY={};
-  MKEYS.forEach(m=>{ PROXY[m]=avgCVP(m); });
-
-  // Per-machine accumulators
   const acc={};
-  MKEYS.forEach(m=>{ acc[m]={hs:0,hsCmo:0,e:0,rem:0,gas:0,mwhrp:0,remPot:0}; });
-
-  const potNom={};
-  MKEYS.forEach(m=>{ potNom[m]=getPotNom(m); });
+  MKEYS.forEach(m=>{acc[m]={hs:0,hsCmo:0,e:0,renta:0,mwhrp:0,remPot:0};});
 
   dates.forEach(fecha=>{
     const cmoRow=cmoRows.find(x=>x.fecha===fecha);
     const ppadRow=ppadRows.find(x=>x.fecha===fecha);
     for(let h=0;h<24;h++){
       const cmo=(cmoRow?.h?cmoRow.h[h]:null)??cmoRow?.avg??0;
-      const ppad=(ppadRow?.h?ppadRow.h[h]:null)??ppadRow?.avg??0;
+      const ppad=(ppadRow?.h&&ppadRow.h[h]!=null)?ppadRow.h[h]:0;
       MKEYS.forEach(m=>{
         const estRow=getRows(ESTKEYS[m]).find(x=>x.fecha===fecha);
         const est=(estRow?.h?estRow.h[h]:null)??'';
@@ -2307,8 +2313,7 @@ function buildIndisp(){
         const fpRow=getRows(FPKEYS[m]).find(x=>x.fecha===fecha);
         const fp=(fpRow?.h?fpRow.h[h]:null)??fpRow?.avg??1;
         acc[m].hs++;
-        // CVP for this hour
-        let cvpD=getCVP(m,fecha,h);
+        let cvpD=getCVP2(m,fecha,h);
         if(!cvpD) cvpD=PROXY[m];
         const {c,t,o}=cvpD; const cvp=c+t+o;
         // Energy: only if CMO*FP > CVP
@@ -2316,8 +2321,9 @@ function buildIndisp(){
           acc[m].hsCmo++;
           const e=potNom[m];
           const rmin=(cvp/tc<RMIN_THR?RMIN_LO:RMIN_HI)*tc;
-          const rem=cvp+Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*0.8);
-          acc[m].e+=e; acc[m].rem+=rem*e; acc[m].gas+=(c+t)*e;
+          // Solo la renta marginal perdida (no el CVP — es costo de producción)
+          const renta=Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*0.8);
+          acc[m].e+=e; acc[m].renta+=renta*e;
         }
         // Potencia: all HRP hours
         if(ppad>0 && potNom[m]>0){
@@ -2329,76 +2335,62 @@ function buildIndisp(){
 
   const METODOLOGIA=`<div style="background:var(--surface2);border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Metodología del cálculo</div>
-    <b>Energía adicional:</b> Solo en horas i-i/lib donde CMO×FP &gt; CVP. Potencia = POT_NOM del mes (máx histórico si no generó). Rem = CVP + MAX(RMIN; (CMO×FP−CVP)×FRA×FRC). Gas = (Comb+Transp)×E.<br>
-    <b>CVP en i-i:</b> (1) hoja propia · (2) partner CC (TG23↔TV11, TG22↔TV12) · (3) grupo · (4) promedio mensual proxy.<br>
-    <b>Potencia:</b> Todas las horas HRP (PPAD&gt;0). Rem = POT_NOM×KP×PPAD×TC.<br>
-    <b>Total:</b> Renta E (Rem−Gas) + Rem. Pot. — Calculado dinámicamente del mes seleccionado.
+    <b>Renta marginal perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP, la renta que no se cobró = MAX(RMIN ; (CMO×FP − CVP) × FRA × FRC) × E. No incluye CVP (es costo de producción — no se pierde al estar indisponible).<br>
+    <b>CVP en horas i-i:</b> (1) hoja propia · (2) partner CC (TG23↔TV11, TG22↔TV12) · (3) grupo · (4) promedio mensual proxy.<br>
+    <b>Potencia:</b> Rem. Pot. = POT_NOM × KP × PPAD × TC en todas las horas HRP (PPAD&gt;0).<br>
+    <b>Total perdido:</b> Renta marginal E + Rem. Pot.
   </div>`;
 
-  // KPI totals
   const totHs=MKEYS.reduce((s,m)=>s+acc[m].hs,0);
   const totE=MKEYS.reduce((s,m)=>s+acc[m].e,0);
-  const totRemE=MKEYS.reduce((s,m)=>s+acc[m].rem,0);
-  const totGas=MKEYS.reduce((s,m)=>s+acc[m].gas,0);
-  const totRentaE=(totRemE-totGas)/tc;
-  const totRemPot=MKEYS.reduce((s,m)=>s+acc[m].remPot,0)/tc;
-  const totTotal=totRentaE+totRemPot;
+  const totRenta=MKEYS.reduce((s,m)=>s+acc[m].renta,0);
+  const totRemPot=MKEYS.reduce((s,m)=>s+acc[m].remPot,0);
+  const totTotal=(totRenta+totRemPot)/tc;
   const fmtU=v=>Math.round(v).toLocaleString('es-AR');
 
   const kpiHtml=`<div class="kr" style="margin-bottom:18px">
     <div class="kpi"><div class="kpi-lbl">Hs indisp. (i-i/lib)</div><div class="kpi-val w">${fmtU(totHs)}</div><div class="kpi-unit">h·máquina en el mes</div></div>
     <div class="kpi"><div class="kpi-lbl">Energía potencial</div><div class="kpi-val a">${fmtU(Math.round(totE))}</div><div class="kpi-unit">MWh (horas CMO&gt;CVP)</div></div>
-    <div class="kpi"><div class="kpi-lbl">Renta E adicional</div><div class="kpi-val s">USD ${fmtU(totRentaE)}</div><div class="kpi-unit">Rem − Gas</div></div>
-    <div class="kpi"><div class="kpi-lbl">Rem. Potencia adicional</div><div class="kpi-val d">USD ${fmtU(totRemPot)}</div><div class="kpi-unit">HRP hours</div></div>
+    <div class="kpi"><div class="kpi-lbl">Renta marginal E perdida</div><div class="kpi-val s">USD ${fmtU(totRenta/tc)}</div><div class="kpi-unit">MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)×E</div></div>
+    <div class="kpi"><div class="kpi-lbl">Rem. Potencia perdida</div><div class="kpi-val d">USD ${fmtU(totRemPot/tc)}</div><div class="kpi-unit">HRP hours</div></div>
     <div class="kpi" style="border-color:rgba(79,142,247,.5)"><div class="kpi-lbl">Renta total perdida</div><div class="kpi-val" style="color:var(--accent);font-size:22px">USD ${fmtU(totTotal)}</div><div class="kpi-unit">Renta E + Rem. Pot.</div></div>
   </div>`;
 
-  // Per-machine table
   const hdrs=`<tr style="border-bottom:2px solid var(--border2)">
     <th style="padding:5px 10px;color:var(--muted);font-weight:500;text-align:left">Máquina</th>
     <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Pot. nom.</th>
     <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Hs indisp.</th>
     <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Hs CMO&gt;CVP</th>
     <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">E (MWh)</th>
-    <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">Rem E ($)</th>
-    <th style="padding:5px 8px;color:var(--danger);font-weight:500;text-align:right">Gas ($)</th>
-    <th style="padding:5px 8px;color:var(--success);font-weight:500;text-align:right">Renta E ($)</th>
+    <th style="padding:5px 8px;color:var(--success);font-weight:500;text-align:right">Renta marg. E ($)</th>
     <th style="padding:5px 8px;color:var(--muted);font-weight:500;text-align:right">MW·hrp</th>
     <th style="padding:5px 8px;color:var(--success);font-weight:500;text-align:right">Rem Pot ($)</th>
     <th style="padding:5px 8px;color:var(--accent);font-weight:500;text-align:right">Renta E+Pot (USD)</th>
   </tr>`;
 
   const rows2=MKEYS.map((m,i)=>{
-    const a=acc[m]; const renta=a.rem-a.gas; const tot=(renta+a.remPot)/tc;
+    const a=acc[m]; const tot=(a.renta+a.remPot)/tc;
     return `<tr style="${i%2?'background:var(--surface2)':''}">
       <td style="padding:6px 10px;font-weight:600;color:${CL[i]}">${m}</td>
       <td style="text-align:right;padding:6px 8px;color:var(--muted)">${potNom[m].toFixed(1)} MW</td>
       <td style="text-align:right;padding:6px 8px">${a.hs}</td>
       <td style="text-align:right;padding:6px 8px;color:var(--muted)">${a.hsCmo}</td>
       <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(a.e))}</td>
-      <td style="text-align:right;padding:6px 8px">${fmtM(a.rem)}</td>
-      <td style="text-align:right;padding:6px 8px;color:var(--danger)">${fmtM(a.gas)}</td>
-      <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:500">${fmtM(renta)}</td>
+      <td style="text-align:right;padding:6px 8px;color:var(--success);font-weight:500">${fmtM(a.renta)}</td>
       <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(a.mwhrp))}</td>
       <td style="text-align:right;padding:6px 8px;color:var(--success)">${fmtM(a.remPot)}</td>
-      <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${a.hs>0?'$'+fmtM(renta+a.remPot)+'<br><span style="font-size:11px;color:var(--teal)">USD '+fmtU(Math.round(tot))+'</span>':'-'}</td>
+      <td style="text-align:right;padding:6px 8px;font-weight:600;color:var(--accent)">${a.hs>0?'$'+fmtM(a.renta+a.remPot)+'<br><span style="font-size:11px;color:var(--teal)">USD '+fmtU(Math.round(tot))+'</span>':'-'}</td>
     </tr>`;
   }).join('');
 
-  const totRenta=MKEYS.reduce((s,m)=>s+(acc[m].rem-acc[m].gas),0);
-  const totRentaPot=MKEYS.reduce((s,m)=>s+acc[m].remPot,0);
   const totRow=`<tr style="border-top:2px solid var(--border2);font-weight:600">
     <td style="padding:6px 10px;color:var(--muted)">TOTAL</td>
-    <td style="text-align:right;padding:6px 8px;color:var(--muted)">—</td>
-    <td style="text-align:right;padding:6px 8px">${fmtU(totHs)}</td>
-    <td style="text-align:right;padding:6px 8px;color:var(--muted)">${MKEYS.reduce((s,m)=>s+acc[m].hsCmo,0)}</td>
+    <td colspan="3" style="padding:6px 8px"></td>
     <td style="text-align:right;padding:6px 8px">${fmtU(Math.round(totE))}</td>
-    <td style="text-align:right;padding:6px 8px">${fmtM(totRemE)}</td>
-    <td style="text-align:right;padding:6px 8px;color:var(--danger)">${fmtM(totGas)}</td>
     <td style="text-align:right;padding:6px 8px;color:var(--success)">${fmtM(totRenta)}</td>
     <td style="text-align:right;padding:6px 8px;color:var(--muted)">${fmtU(Math.round(MKEYS.reduce((s,m)=>s+acc[m].mwhrp,0)))}</td>
-    <td style="text-align:right;padding:6px 8px;color:var(--success)">${fmtM(totRentaPot)}</td>
-    <td style="text-align:right;padding:6px 8px;color:var(--accent)">$${fmtM(totRenta+totRentaPot)}<br><span style="font-size:11px;color:var(--teal)">USD ${fmtU(Math.round(totTotal))}</span></td>
+    <td style="text-align:right;padding:6px 8px;color:var(--success)">${fmtM(totRemPot)}</td>
+    <td style="text-align:right;padding:6px 8px;color:var(--accent)">$${fmtM(totRenta+totRemPot)}<br><span style="font-size:11px;color:var(--teal)">USD ${fmtU(Math.round(totTotal))}</span></td>
   </tr>`;
 
   const tableHtml=`<div class="card" style="padding:20px 24px;overflow-x:auto">
