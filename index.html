@@ -825,26 +825,40 @@ function getTCDate(){
 }
 
 async function ensureTC(){
-  // Already have a valid TC for this month
+  // Already have a valid TC cached for this month
   if(TC_CACHE[MONTH]?.tc) return;
-  // Check MONTH_CFG (populated from config.json)
+
   const cfgTC=MONTH_CFG[MONTH]?.TC;
-  if(cfgTC && cfgTC>0){
-    TC_CACHE[MONTH]={tc:cfgTC, date:MONTH_CFG[MONTH]?.TCDate||null};
+  const cfgDate=MONTH_CFG[MONTH]?.TCDate;
+  const now=new Date();
+  const curKey=`${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  // Past month: config.json is the source of truth — never call API
+  if(MONTH !== curKey){
+    if(cfgTC && cfgTC>0) TC_CACHE[MONTH]={tc:cfgTC, date:cfgDate||null};
     return;
   }
-  // No TC in config — fetch live from dolarapi.com (current month only)
+
+  // Current month: use config TC as base
+  if(cfgTC && cfgTC>0){
+    TC_CACHE[MONTH]={tc:cfgTC, date:cfgDate||null};
+    // If config TC is from today, no need to call API
+    const today=now.toISOString().slice(0,10);
+    if(cfgDate && cfgDate>=today) return;
+  }
+
+  // Fetch live TC from dolarapi.com for current month
   try {
-    const r = await fetch('https://dolarapi.com/v1/dolares/mayorista');
+    const r=await fetch('https://dolarapi.com/v1/dolares/mayorista');
     if(r.ok){
-      const data = await r.json();
-      const tc = parseFloat(data.venta);
+      const data=await r.json();
+      const tc=parseFloat(data.venta);
       if(tc>0){
-        TC_CACHE[MONTH]={tc, date:new Date().toISOString().slice(0,10)};
+        TC_CACHE[MONTH]={tc, date:now.toISOString().slice(0,10)};
         if(MONTH_CFG[MONTH]) MONTH_CFG[MONTH].TC=tc;
       }
     }
-  } catch(e){ console.warn('TC fetch error:', e); }
+  } catch(e){ console.warn('TC fetch error:',e); }
 }
 function getKP(){return MONTH_CFG[MONTH]?.KP||0.9;}
 // FRC por fecha: busca solo en las quincenas del mes seleccionado
