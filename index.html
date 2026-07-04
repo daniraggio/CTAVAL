@@ -3376,9 +3376,7 @@ function applyPrefs(prefs) {
     Object.keys(prefs.MONTH_CFG).forEach(k => {
       const src = prefs.MONTH_CFG[k];
       if (!src) return;
-      // Merge into MONTH_CFG — create entry if missing
       if (!MONTH_CFG[k]) MONTH_CFG[k] = {TC:0, KP:0.9};
-      // Never overwrite TC with 0 or falsy
       Object.keys(src).forEach(field => {
         if (field === 'TC' || field === 'TCDate') {
           if (src[field]) MONTH_CFG[k][field] = src[field];
@@ -3386,10 +3384,10 @@ function applyPrefs(prefs) {
           MONTH_CFG[k][field] = src[field];
         }
       });
-      // Populate TC_CACHE immediately so getTC() works without ensureTC()
       const tc = MONTH_CFG[k].TC;
       if (tc && tc > 0) {
         TC_CACHE[k] = {tc, date: MONTH_CFG[k].TCDate || null};
+        console.log(`TC loaded: ${k} = ${tc} (${MONTH_CFG[k].TCDate||'no date'})`);
       }
     });
   }
@@ -3461,7 +3459,9 @@ function initDashboard(loadedData) {
   // Apply localStorage first, then repo config on top (repo TC never gets overwritten)
   const localPrefs = loadPrefs();
   if (localPrefs) applyPrefs(localPrefs);
+  console.log('repoPrefs MONTH_CFG:', loadedData.repoPrefs?.MONTH_CFG ? Object.keys(loadedData.repoPrefs.MONTH_CFG) : 'NONE');
   if (loadedData.repoPrefs) applyPrefs(loadedData.repoPrefs);
+  console.log('TC_CACHE after applyPrefs:', JSON.stringify(TC_CACHE));
 
   // Restore last-viewed month (local prefs take priority)
   const lastMonth = localPrefs?.LAST_MONTH || loadedData.repoPrefs?.LAST_MONTH;
