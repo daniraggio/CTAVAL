@@ -746,8 +746,8 @@ async function loadAllData() {
       badge: `${monthLabel} · ${daysActual} días`,
       sortKey: `${year}-${mm}`
     };
-    // Default TC and KP — user can override in config
-    MONTH_CFG_DYN[key] = {TC: 1200, KP: 0.9};
+    // Default TC=0 means "not set" — will be populated from config.json or API
+    MONTH_CFG_DYN[key] = {TC: 0, KP: 0.9};
   }
 
   setProgress(95);
@@ -815,7 +815,9 @@ async function fetchTCFromBCRA(monthKey){
 
 function getTC(){
   const cached=TC_CACHE[MONTH];
-  return cached?.tc || MONTH_CFG[MONTH]?.TC || 1200;
+  if(cached?.tc) return cached.tc;
+  const cfgTC=MONTH_CFG[MONTH]?.TC;
+  return (cfgTC && cfgTC>0) ? cfgTC : 0;
 }
 
 function getTCDate(){
@@ -823,20 +825,26 @@ function getTCDate(){
 }
 
 async function ensureTC(){
+  // Already have a valid TC for this month
   if(TC_CACHE[MONTH]?.tc) return;
-  // Only fetch live TC for the current month — past months use the config value
-  const now=new Date(); const curKey=`${now.getFullYear()}_${String(now.getMonth()+1).padStart(2,'0')}`;
-  if(MONTH !== curKey){
-    // Past month: use MONTH_CFG value, don't call API
-    const cfgTC=MONTH_CFG[MONTH]?.TC;
-    if(cfgTC) TC_CACHE[MONTH]={tc:cfgTC,date:MONTH_CFG[MONTH]?.TCDate||null};
+  // Check MONTH_CFG (populated from config.json)
+  const cfgTC=MONTH_CFG[MONTH]?.TC;
+  if(cfgTC && cfgTC>0){
+    TC_CACHE[MONTH]={tc:cfgTC, date:MONTH_CFG[MONTH]?.TCDate||null};
     return;
   }
-  const result=await fetchTCFromBCRA(MONTH);
-  if(result){
-    TC_CACHE[MONTH]={tc:result.tc,date:result.date};
-    if(MONTH_CFG[MONTH]) MONTH_CFG[MONTH].TC=result.tc;
-  }
+  // No TC in config — fetch live from dolarapi.com (current month only)
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares/mayorista');
+    if(r.ok){
+      const data = await r.json();
+      const tc = parseFloat(data.venta);
+      if(tc>0){
+        TC_CACHE[MONTH]={tc, date:new Date().toISOString().slice(0,10)};
+        if(MONTH_CFG[MONTH]) MONTH_CFG[MONTH].TC=tc;
+      }
+    }
+  } catch(e){ console.warn('TC fetch error:', e); }
 }
 function getKP(){return MONTH_CFG[MONTH]?.KP||0.9;}
 // FRC por fecha: busca solo en las quincenas del mes seleccionado
@@ -1608,9 +1616,11 @@ async function buildResumen(){
   }
   const tcDate=getTCDate();
   const tcDateStr=tcDate?` · ${tcDate.slice(8)}/${tcDate.slice(5,7)}/${tcDate.slice(0,4)}`:' · actualizando...';
-  document.getElementById('tbl-resumen-tc').innerHTML=
-    `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
-    `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${tcDateStr}</span>`;
+  const tcDisplay = tc>0
+    ? `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
+      `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${tcDateStr}</span>`
+    : `<span style="font-size:13px;color:var(--warn)">⚠ TC no disponible — actualizá config.json</span>`;
+  document.getElementById('tbl-resumen-tc').innerHTML=tcDisplay;
 
   // GA hours card
   const gaH={};let gaTotal=0;
@@ -3321,11 +3331,13 @@ function savePrefs() {
     const prefs = {
       _version: 1,
       CFG: {...CFG},
-      MONTH_CFG: JSON.parse(JSON.stringify(MONTH_CFG)),
+      // Strip TC from MONTH_CFG before saving to localStorage — TC always comes from config.json or API
+      MONTH_CFG: Object.fromEntries(Object.entries(JSON.parse(JSON.stringify(MONTH_CFG))).map(([k,v])=>{
+        const {TC, TCDate, ...rest} = v; return [k, rest];
+      })),
       LAST_MONTH: MONTH,
     };
     localStorage.setItem(PERSIST_KEY, JSON.stringify(prefs));
-    // Also update the export so user can commit to repo
     window._lastPrefs = prefs;
     updateExportBtn();
   } catch(e) { console.warn('Could not save prefs', e); }
