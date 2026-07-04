@@ -1646,7 +1646,12 @@ async function buildResumen(){
 
 function _buildResumenCharts(eChartId,_legId,cmoChartId,usdMode){
   const tc=usdMode?getTC():null;
-  const dates=allDates(Object.values(EKEYS));
+  // Build full month date range (all days, with or without data)
+  const [_y,_m]=MONTH.split('_').map(Number);
+  const _lastDay=new Date(_y,_m,0).getDate();
+  const dates=Array.from({length:_lastDay},(_,i)=>{
+    const d=i+1; return `${_y}-${String(_m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  });
   const eMWh=r=>r?(r.h?r.h.reduce((a,b)=>a+(b||0),0):r.avg*24):null;
   const ds=MKEYS.map((m,i)=>({label:m,data:dates.map(d=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);return eMWh(r);}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
   const totData=dates.map(d=>{let s=0;MKEYS.forEach(m=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);if(r)s+=eMWh(r)||0;});return s;});
