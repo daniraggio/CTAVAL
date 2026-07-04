@@ -3374,10 +3374,22 @@ function applyPrefs(prefs) {
   }
   if (prefs.MONTH_CFG) {
     Object.keys(prefs.MONTH_CFG).forEach(k => {
-      if (MONTH_CFG[k]) Object.assign(MONTH_CFG[k], prefs.MONTH_CFG[k]);
-      // Also populate TC_CACHE so getTC() picks it up immediately
-      if (prefs.MONTH_CFG[k]?.TC) {
-        TC_CACHE[k] = {tc: prefs.MONTH_CFG[k].TC, date: prefs.MONTH_CFG[k].TCDate || null};
+      const src = prefs.MONTH_CFG[k];
+      if (!src) return;
+      // Merge into MONTH_CFG — create entry if missing
+      if (!MONTH_CFG[k]) MONTH_CFG[k] = {TC:0, KP:0.9};
+      // Never overwrite TC with 0 or falsy
+      Object.keys(src).forEach(field => {
+        if (field === 'TC' || field === 'TCDate') {
+          if (src[field]) MONTH_CFG[k][field] = src[field];
+        } else {
+          MONTH_CFG[k][field] = src[field];
+        }
+      });
+      // Populate TC_CACHE immediately so getTC() works without ensureTC()
+      const tc = MONTH_CFG[k].TC;
+      if (tc && tc > 0) {
+        TC_CACHE[k] = {tc, date: MONTH_CFG[k].TCDate || null};
       }
     });
   }
@@ -3445,21 +3457,11 @@ function initDashboard(loadedData) {
   // Set current month to most recent
   MONTH = keys[keys.length - 1];
 
-  // Priority: localStorage (local overrides) < repo config.json TC (official committed value)
-  // Apply repo prefs first, then localStorage overrides — EXCEPT for TC which always uses repo value
-  if (loadedData.repoPrefs) applyPrefs(loadedData.repoPrefs);
+  // Priority: repo config.json wins over localStorage for TC
+  // Apply localStorage first, then repo config on top (repo TC never gets overwritten)
   const localPrefs = loadPrefs();
   if (localPrefs) applyPrefs(localPrefs);
-  // Re-apply repo TC after localStorage to ensure committed TC values win
-  if (loadedData.repoPrefs?.MONTH_CFG) {
-    Object.keys(loadedData.repoPrefs.MONTH_CFG).forEach(k => {
-      const repoTC = loadedData.repoPrefs.MONTH_CFG[k]?.TC;
-      if (repoTC) {
-        if (MONTH_CFG[k]) MONTH_CFG[k].TC = repoTC;
-        TC_CACHE[k] = {tc: repoTC, date: loadedData.repoPrefs.MONTH_CFG[k]?.TCDate || null};
-      }
-    });
-  }
+  if (loadedData.repoPrefs) applyPrefs(loadedData.repoPrefs);
 
   // Restore last-viewed month (local prefs take priority)
   const lastMonth = localPrefs?.LAST_MONTH || loadedData.repoPrefs?.LAST_MONTH;
