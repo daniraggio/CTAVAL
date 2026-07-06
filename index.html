@@ -194,10 +194,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 
   <!-- RESUMEN USD -->
   <div class="sec" id="sec-resumenUSD">
-    <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:center;gap:32px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio</div>
-        <div id="tbl-resumenUSD-tc" style="display:inline-block"></div>
+    <div class="card" style="padding:12px 20px;margin-bottom:18px;display:flex;align-items:flex-start;gap:32px;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Tipo de cambio</div>
+          <div id="tbl-resumenUSD-tc" style="display:inline-block"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">SPOT promedio mes</div>
+          <div id="tbl-resumenUSD-spot-tc" style="display:inline-block"></div>
+        </div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Producción con gas propio</div>
@@ -249,7 +255,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="cw" style="height:300px"><canvas id="cSpotPrice" role="img" aria-label="Precio SPOT diario"></canvas></div>
     </div>
     <div class="card" style="margin-top:18px;overflow-x:auto">
-      <table id="tbl-spotprice" style="border-collapse:collapse;width:auto;margin:0 auto"><thead id="thead-spotprice"></thead><tbody id="tbody-spotprice"></tbody></table>
+      <table id="tbl-spotprice" style="border-collapse:collapse;width:auto;margin:0"><thead id="thead-spotprice"></thead><tbody id="tbody-spotprice"></tbody></table>
     </div>
   </div>
   <div class="sec" id="sec-cmo">
@@ -1862,7 +1868,6 @@ function _renderResumenUSD(){
             <div style="font-size:11px;color:var(--muted);margin-bottom:3px">CMO promedio</div>
             <div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--warn)">${(cmoYest/tc).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div>
           </div>`:''}
-          ${(()=>{const spotMes=SPOT_DATA[MONTH]||[];const spotVals=spotMes.map(r=>r.spot);const spotAvg=spotVals.length?spotVals.reduce((a,b)=>a+b,0)/spotVals.length:null;return spotAvg!=null?`<div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">SPOT promedio mes</div><div style="font-family:var(--mono);font-size:20px;font-weight:600;color:var(--amber)">${fmtN(spotAvg,2)} <span style="font-size:11px;font-weight:400;color:var(--muted)">USD/MWh</span></div><div style="font-size:10px;color:var(--muted)">${spotVals.length} día${spotVals.length!==1?'s':''} promediados</div></div>`:'';})()}
         </div>
       </div>`;
   }
@@ -1872,6 +1877,17 @@ function _renderResumenUSD(){
   document.getElementById('tbl-resumenUSD-tc').innerHTML=
     `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">$ ${Math.round(tc).toLocaleString('es-AR')}</span>`+
     `<span style="font-size:11px;color:var(--muted);margin-left:8px">ARS/USD Com.3500${_tcDs2}</span>`;
+
+  // SPOT promedio mes — below TC
+  const _spotTcEl=document.getElementById('tbl-resumenUSD-spot-tc');
+  if(_spotTcEl){
+    const _spotMes2=SPOT_DATA[MONTH]||[];
+    const _spotVals2=_spotMes2.map(r=>r.spot);
+    const _spotAvg2=_spotVals2.length?_spotVals2.reduce((a,b)=>a+b,0)/_spotVals2.length:null;
+    _spotTcEl.innerHTML=_spotAvg2!=null
+      ?`<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--amber)">${fmtN(_spotAvg2,2)}</span><span style="font-size:11px;color:var(--muted);margin-left:8px">USD/MWh · ${_spotVals2.length} días</span>`
+      :`<span style="font-size:13px;color:var(--muted)">Sin datos</span>`;
+  }
 
   // GA hours card
   const gaH={};let gaTotal=0;
