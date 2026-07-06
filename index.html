@@ -249,7 +249,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div class="cw" style="height:300px"><canvas id="cSpotPrice" role="img" aria-label="Precio SPOT diario"></canvas></div>
     </div>
     <div class="card" style="margin-top:18px;overflow-x:auto">
-      <table class="tbl"><thead id="thead-spotprice"></thead><tbody id="tbody-spotprice"></tbody></table>
+      <table id="tbl-spotprice" style="border-collapse:collapse;width:auto;margin:0 auto"><thead id="thead-spotprice"></thead><tbody id="tbody-spotprice"></tbody></table>
     </div>
   </div>
   <div class="sec" id="sec-cmo">
@@ -270,6 +270,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
 
   <!-- CVP COMBREM -->
   <div class="sec" id="sec-indisp">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:700;color:var(--danger)">⚠ Sección en revisión — no tomar los datos como válidos</span>
+    </div>
     <div id="indisp-content"></div>
   </div>
   <div class="sec" id="sec-cvpTotal">
@@ -2253,14 +2256,25 @@ function buildSpotPrice(){
   const thead = document.getElementById('thead-spotprice');
   const tbody = document.getElementById('tbody-spotprice');
   if(!thead||!tbody) return;
-  thead.innerHTML = `<tr><th>Fecha</th><th class="num">ENER SPOT (USD/MWh)</th><th class="num">ENER SPOT ($/MWh)</th></tr>`;
+  const thStyle='padding:8px 16px;text-align:center;white-space:nowrap;color:var(--muted);font-size:12px;font-weight:500;border-bottom:2px solid var(--border2)';
+  const tdDate='padding:6px 16px;text-align:center;font-size:12px;white-space:nowrap';
+  const tdNum='padding:6px 16px;text-align:center;font-size:12px;white-space:nowrap';
+  thead.innerHTML = `<tr>
+    <th style="${thStyle}">Fecha</th>
+    <th style="${thStyle}">ENER SPOT (USD/MWh)</th>
+    <th style="${thStyle}">ENER SPOT ($/MWh)</th>
+  </tr>`;
   tbody.innerHTML = spotRows.map((r,i)=>`
     <tr style="${i%2?'background:var(--surface2)':''}">
-      <td class="rl">${fmtDate(r.fecha)}</td>
-      <td class="num" style="color:var(--warn)">${fmtN(r.spot,2)}</td>
-      <td class="num">${fmtK(r.spot*(tc||1))}</td>
+      <td style="${tdDate}">${fmtDate(r.fecha)}</td>
+      <td style="${tdNum};color:var(--warn)">${fmtN(r.spot,2)}</td>
+      <td style="${tdNum}">${fmtK(r.spot*(tc||1))}</td>
     </tr>`).join('')+
-    (avg!=null?`<tr class="hi"><td class="rl">Promedio</td><td class="num" style="color:var(--accent)">${fmtN(avg,2)}</td><td class="num">${fmtK(avg*(tc||1))}</td></tr>`:'');
+    (avg!=null?`<tr style="background:var(--surface2);font-weight:600">
+      <td style="${tdDate};color:var(--accent)">Promedio</td>
+      <td style="${tdNum};color:var(--accent)">${fmtN(avg,2)}</td>
+      <td style="${tdNum};color:var(--accent)">${fmtK(avg*(tc||1))}</td>
+    </tr>`:'');
 }
 
 function buildIndisp(){
