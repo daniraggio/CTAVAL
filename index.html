@@ -647,28 +647,43 @@ function fileToMonthKey(filename) {
 async function loadSpotData(){
   try {
     const resp = await fetch(SPOT_URL + '?t=' + Date.now());
-    if(!resp.ok) return;
+    if(!resp.ok){ console.warn('SPOT: archivo no encontrado (404)'); return; }
     const buf = await resp.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const wb = XLSX.read(buf, {type:'array', cellDates:false, raw:true});
     const ws = wb.Sheets['Precios'];
-    if(!ws) return;
-    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:null});
+    if(!ws){ console.warn('SPOT: hoja "Precios" no encontrada'); return; }
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+    // Row 19 (index 18) = headers, data starts at index 19
     for(let i=19; i<rows.length; i++){
       const row = rows[i];
-      if(!row || !row[3] || !row[5]) continue;
-      let fecha = row[3];
-      if(typeof fecha === 'string') fecha = new Date(fecha);
-      else if(!(fecha instanceof Date)) continue;
-      if(isNaN(fecha)) continue;
-      const y = fecha.getFullYear(); const m = fecha.getMonth()+1;
+      if(!row) continue;
+      const dVal = row[3]; // col D = fecha exacta del día
+      const spot = row[5]; // col F = ENER SPOT USD/MWh
+      if(dVal == null || spot == null) continue;
+      // Convert Excel date serial to JS Date (UTC)
+      let fecha;
+      if(typeof dVal === 'number'){
+        fecha = new Date(Math.round((dVal - 25569) * 86400 * 1000));
+      } else if(dVal instanceof Date){
+        fecha = dVal;
+      } else if(typeof dVal === 'string' && dVal.length >= 8){
+        fecha = new Date(dVal);
+      } else { continue; }
+      if(!fecha || isNaN(fecha.getTime())) continue;
+      const y = fecha.getUTCFullYear();
+      const m = fecha.getUTCMonth()+1;
+      const d = fecha.getUTCDate();
+      if(y < 2025 || y > 2030) continue; // sanity check
       const key = `${y}_${String(m).padStart(2,'0')}`;
-      const fechaStr = `${y}-${String(m).padStart(2,'0')}-${String(fecha.getDate()).padStart(2,'0')}`;
-      const spot = parseFloat(row[5]);
-      if(isNaN(spot)) continue;
+      const fechaStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const spotVal = parseFloat(spot);
+      if(isNaN(spotVal)) continue;
       if(!SPOT_DATA[key]) SPOT_DATA[key]=[];
-      SPOT_DATA[key].push({fecha:fechaStr, spot});
+      if(!SPOT_DATA[key].find(r=>r.fecha===fechaStr))
+        SPOT_DATA[key].push({fecha:fechaStr, spot:spotVal});
     }
-    console.log('SPOT data loaded:', Object.keys(SPOT_DATA).length, 'months');
+    console.log('SPOT loaded:', Object.keys(SPOT_DATA).length, 'months,',
+      Object.values(SPOT_DATA).reduce((s,a)=>s+a.length,0), 'days');
   } catch(e){ console.warn('SPOT load error:', e); }
 }
 
@@ -3337,7 +3352,7 @@ function buildEstOperativo(){
 //   2. localStorage — fast runtime cache, fallback if repo config not found
 const PERSIST_KEY = 'ctaval_cfg_v1';
 const CONFIG_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/config.json';
-const SPOT_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/resumen_precios_previstos_xlsx.xlsx';
+const SPOT_URL = 'https://raw.githubusercontent.com/daniraggio/CTAVAL/main/data/resumen_precios_previstos.xlsx';
 let SPOT_DATA = {}; // {YYYY_MM: [{fecha, spot}]}
 
 function savePrefs() {
