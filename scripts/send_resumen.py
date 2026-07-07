@@ -15,7 +15,7 @@ from playwright.sync_api import sync_playwright
 GMAIL_USER      = "jarvis.aconcagua@gmail.com"
 GMAIL_APP_PASS  = os.environ.get("GMAIL_APP_PASSWORD", "")
 FROM_EMAIL      = "jarvis.aconcagua@gmail.com"
-TO_EMAILS       = ["draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
+TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
 
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
@@ -35,16 +35,15 @@ def take_screenshot():
     print("  → Abriendo dashboard...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page = browser.new_page(viewport={"width": 1400, "height": 1200})
         page.goto(DASHBOARD_URL, timeout=60_000)
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(6_000)
+        page.wait_for_timeout(8_000)
         try:
-            # Select the last month that has actual data (may differ from current calendar month)
+            # Select the last month that has actual data
             last_month_with_data = page.evaluate("""() => {
                 const sel = document.getElementById('monthSel');
                 if (!sel) return null;
-                // Find last month with energy data
                 const opts = Array.from(sel.options).map(o => o.value);
                 for (let i = opts.length - 1; i >= 0; i--) {
                     const k = opts[i];
@@ -55,13 +54,34 @@ def take_screenshot():
             }""")
             if last_month_with_data:
                 page.evaluate(f"selectMonth('{last_month_with_data}')")
-                page.wait_for_timeout(2_000)
+                page.wait_for_timeout(3_000)
             # Navigate to Resumen (USD) section
             page.evaluate("showSec('resumenUSD')")
-            page.wait_for_timeout(2_000)
-            page.locator("#sec-resumenUSD").screenshot(path=str(SCREENSHOT_PATH))
-        except:
-            page.screenshot(path=str(SCREENSHOT_PATH))
+            page.wait_for_timeout(3_000)
+            # Capture the full section including scrollable content
+            sec = page.locator("#sec-resumenUSD")
+            # Scroll into view and expand viewport to full content height
+            sec.scroll_into_view_if_needed()
+            page.wait_for_timeout(1_000)
+            # Use full page screenshot clipped to the section bounding box
+            bbox = sec.bounding_box()
+            if bbox:
+                # Add padding and ensure minimum width
+                padding = 16
+                page.screenshot(
+                    path=str(SCREENSHOT_PATH),
+                    clip={
+                        "x": max(0, bbox["x"] - padding),
+                        "y": max(0, bbox["y"] - padding),
+                        "width": bbox["width"] + padding * 2,
+                        "height": bbox["height"] + padding * 2
+                    }
+                )
+            else:
+                sec.screenshot(path=str(SCREENSHOT_PATH))
+        except Exception as e:
+            print(f"  ⚠ Screenshot fallback: {e}")
+            page.screenshot(path=str(SCREENSHOT_PATH), full_page=True)
         browser.close()
     print(f"  → Screenshot: {SCREENSHOT_PATH.stat().st_size // 1024} KB")
 
@@ -97,7 +117,10 @@ def build_html_email():
     now = datetime.now(ARG_TZ)
     mes = MESES[now.month-1]
     fecha_str = now.strftime("%d/%m/%Y %H:%M")
-    img_url = f"{IMG_PUBLIC_URL}?t={int(now.timestamp())}"
+
+    # Embed screenshot as base64 so the email is self-contained
+    img_b64 = base64.b64encode(SCREENSHOT_PATH.read_bytes()).decode()
+    img_tag = f'<img src="data:image/png;base64,{img_b64}" width="640" style="width:100%;border-radius:6px;display:block" alt="Resumen del mes"/>'
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -110,7 +133,7 @@ def build_html_email():
     </div>
     <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin-bottom:20px">
       <div style="font-size:13px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Resumen — {mes} {now.year}</div>
-      <img src="{img_url}" width="640" style="width:100%;border-radius:6px;display:block" alt="Resumen del mes"/>
+      {img_tag}
     </div>
     <div style="text-align:center;margin:28px 0">
       <a href="{DASHBOARD_LINK}" style="background:#238636;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:14px;display:inline-block">
