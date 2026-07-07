@@ -35,12 +35,13 @@ def take_screenshot():
     print("  → Abriendo dashboard...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        # Wide viewport, very tall to avoid clipping
+        page = browser.new_page(viewport={"width": 1280, "height": 5000})
         page.goto(DASHBOARD_URL, timeout=60_000)
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(6_000)
+        page.wait_for_timeout(8_000)
         try:
-            # Select the last month that has actual data
+            # Select last month with data
             last_month_with_data = page.evaluate("""() => {
                 const sel = document.getElementById('monthSel');
                 if (!sel) return null;
@@ -54,13 +55,42 @@ def take_screenshot():
             }""")
             if last_month_with_data:
                 page.evaluate(f"selectMonth('{last_month_with_data}')")
-                page.wait_for_timeout(2_000)
-            # Navigate to Resumen (USD) section
+                page.wait_for_timeout(3_000)
+
+            # Show resumenUSD and wait for render
             page.evaluate("showSec('resumenUSD')")
-            page.wait_for_timeout(2_000)
-            page.locator("#sec-resumenUSD").screenshot(path=str(SCREENSHOT_PATH))
+            page.wait_for_timeout(4_000)
+
+            # Verify the section is visible
+            is_visible = page.evaluate("""() => {
+                const el = document.getElementById('sec-resumenUSD');
+                return el && el.style.display !== 'none' && el.offsetHeight > 0;
+            }""")
+            print(f"  → sec-resumenUSD visible: {is_visible}")
+
+            # Get bounding box and screenshot with clip
+            bbox = page.evaluate("""() => {
+                const el = document.getElementById('sec-resumenUSD');
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return {x: r.left, y: r.top, width: r.width, height: el.scrollHeight};
+            }""")
+            print(f"  → bbox: {bbox}")
+
+            if bbox and bbox['width'] > 0 and bbox['height'] > 0:
+                page.screenshot(
+                    path=str(SCREENSHOT_PATH),
+                    clip={
+                        "x": max(0, bbox["x"]),
+                        "y": max(0, bbox["y"]),
+                        "width": bbox["width"],
+                        "height": min(bbox["height"], 4800)
+                    }
+                )
+            else:
+                page.screenshot(path=str(SCREENSHOT_PATH))
         except Exception as e:
-            print(f"  ⚠ Screenshot fallback: {e}")
+            print(f"  ⚠ Screenshot error: {e}")
             page.screenshot(path=str(SCREENSHOT_PATH))
         browser.close()
     print(f"  → Screenshot: {SCREENSHOT_PATH.stat().st_size // 1024} KB")
