@@ -1200,21 +1200,21 @@ function calcPotHRP(){
 // Potencia del mes = promedio horario de la SUMA de las 4 máquinas
 // = para cada hora: suma POT_DISP de cada máquina → luego promedio de todas las horas
 function calcPotMes(){
+  // Use total hours of month as denominator (consistent with avgPerMaq calculation)
+  const [_y,_m]=MONTH.split('_').map(Number);
+  const horasTotales=new Date(_y,_m,0).getDate()*24;
+  let totalSum=0;
   const dates=allDates(Object.values(POTKEYS));
-  let totalSum=0, cnt=0;
   dates.forEach(fecha=>{
     for(let h=0;h<24;h++){
-      let sumH=0, anyData=false;
       MKEYS.forEach(m=>{
         const r=getRows(POTKEYS[m]).find(x=>x.fecha===fecha);
         if(!r)return;
-        const val=(r.h?r.h[h]:r.avg)||0;
-        sumH+=val; if(val>0)anyData=true;
+        totalSum+=(r.h?r.h[h]??0:r.avg)||0;
       });
-      if(anyData){totalSum+=sumH;cnt++;}
     }
   });
-  return cnt?totalSum/cnt:0;
+  return horasTotales?totalSum/horasTotales:0;
 }
 
 // Costo Gas = (CVP_Comb_h + CVP_Transp_h) * Energia_h por máquina y hora
@@ -2627,10 +2627,8 @@ function buildPotencia(){
   const totalMWh=mwhPerMaq.reduce((s,v)=>s+v,0);
   const potMes=calcPotMes();
   const tc=getTC();
-  const horasMes=mwhPerMaq.reduce((s,v,i)=>{
-    // count hours with data for this machine
-    let n=0; getRows(POTKEYS[MKEYS[i]]).forEach(r=>{n+=r.h?r.h.filter(v=>v!=null).length:24;}); return Math.max(s,n);
-  },1);
+  const [_py,_pm]=MONTH.split('_').map(Number);
+  const horasMes=new Date(_py,_pm,0).getDate()*24;
   const avgPerMaq=mwhPerMaq.map(v=>v/horasMes);
   const sumAvg=avgPerMaq.reduce((s,v)=>s+v,0);
   document.getElementById('kpi-pot').innerHTML=
