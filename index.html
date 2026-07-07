@@ -2627,9 +2627,15 @@ function buildPotencia(){
   const totalMWh=mwhPerMaq.reduce((s,v)=>s+v,0);
   const potMes=calcPotMes();
   const tc=getTC();
+  const horasMes=mwhPerMaq.reduce((s,v,i)=>{
+    // count hours with data for this machine
+    let n=0; getRows(POTKEYS[MKEYS[i]]).forEach(r=>{n+=r.h?r.h.filter(v=>v!=null).length:24;}); return Math.max(s,n);
+  },1);
+  const avgPerMaq=mwhPerMaq.map(v=>v/horasMes);
+  const sumAvg=avgPerMaq.reduce((s,v)=>s+v,0);
   document.getElementById('kpi-pot').innerHTML=
-    MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} — pot. acum.</div><div class="kpi-val" style="color:${CL[i]}">${fmtFull(mwhPerMaq[i])}</div><div class="kpi-unit">MW·h mes</div></div>`).join('')+
-    `<div class="kpi" style="border-color:rgba(45,212,191,.4)"><div class="kpi-lbl">POT TOTAL MW·h</div><div class="kpi-val" style="color:var(--teal)">${fmtFull(totalMWh)}</div><div class="kpi-unit">MW·h mes</div></div>`+
+    MKEYS.map((m,i)=>`<div class="kpi"><div class="kpi-lbl">${m} — pot. acum.</div><div class="kpi-val" style="color:${CL[i]}">${fmtFull(mwhPerMaq[i])}</div><div class="kpi-unit">MW·h mes · prom ${fmtN(avgPerMaq[i],2)} MW</div></div>`).join('')+
+    `<div class="kpi" style="border-color:rgba(45,212,191,.4)"><div class="kpi-lbl">POT TOTAL MW·h</div><div class="kpi-val" style="color:var(--teal)">${fmtFull(totalMWh)}</div><div class="kpi-unit">MW·h mes · prom ${fmtN(sumAvg,2)} MW (Σ 4 máq.)</div></div>`+
     `<div class="kpi" style="border-color:rgba(79,142,247,.4)"><div class="kpi-lbl">Potencia del mes</div><div class="kpi-val a">${fmtN(potMes,2)}</div><div class="kpi-unit">MW · promedio 4 máquinas</div></div>`+
     `<div class="kpi" style="border-color:rgba(167,139,250,.4)"><div class="kpi-lbl">Rem. potencia TOTAL</div><div class="kpi-val p">${fmtFull(remP.TOTAL)}</div><div class="kpi-unit">USD (Kp=${getKP()})</div></div>`;
   // Potencia chart (separate from energía)
