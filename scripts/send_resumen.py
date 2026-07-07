@@ -39,7 +39,7 @@ def take_screenshot():
         page = browser.new_page(viewport={"width": 1280, "height": 5000})
         page.goto(DASHBOARD_URL, timeout=60_000)
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(8_000)
+        page.wait_for_timeout(12_000)
         try:
             # Select last month with data
             last_month_with_data = page.evaluate("""() => {
@@ -62,7 +62,17 @@ def take_screenshot():
 
             # Show resumenUSD and wait for render
             page.evaluate("showSec('resumenUSD')")
-            page.wait_for_timeout(4_000)
+            page.wait_for_timeout(6_000)
+
+            # Wait until the KPI table has content (data loaded)
+            try:
+                page.wait_for_function(
+                    "() => document.getElementById('tbl-resumenUSD-kpi')?.children?.length > 0",
+                    timeout=15_000
+                )
+            except:
+                pass
+            page.wait_for_timeout(2_000)
 
             # Verify the section is visible
             is_visible = page.evaluate("""() => {
