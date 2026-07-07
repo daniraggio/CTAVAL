@@ -54,7 +54,10 @@ def take_screenshot():
                 return opts[opts.length - 1];
             }""")
             if last_month_with_data:
-                page.evaluate(f"selectMonth('{last_month_with_data}')")
+                page.evaluate(f"""() => {{
+                    const sel = document.getElementById('monthSel');
+                    if (sel) {{ sel.value = '{last_month_with_data}'; switchMonth(); }}
+                }}""")
                 page.wait_for_timeout(3_000)
 
             # Show resumenUSD and wait for render
