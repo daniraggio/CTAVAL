@@ -15,7 +15,7 @@ from playwright.sync_api import sync_playwright
 GMAIL_USER      = "jarvis.aconcagua@gmail.com"
 GMAIL_APP_PASS  = os.environ.get("GMAIL_APP_PASSWORD", "")
 FROM_EMAIL      = "jarvis.aconcagua@gmail.com"
-TO_EMAILS       = ["draggio@aconcaguaenergia.com"]
+TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
 
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
@@ -35,10 +35,10 @@ def take_screenshot():
     print("  → Abriendo dashboard...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1400, "height": 1200})
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(DASHBOARD_URL, timeout=60_000)
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(8_000)
+        page.wait_for_timeout(6_000)
         try:
             # Select the last month that has actual data
             last_month_with_data = page.evaluate("""() => {
@@ -54,34 +54,14 @@ def take_screenshot():
             }""")
             if last_month_with_data:
                 page.evaluate(f"selectMonth('{last_month_with_data}')")
-                page.wait_for_timeout(3_000)
+                page.wait_for_timeout(2_000)
             # Navigate to Resumen (USD) section
             page.evaluate("showSec('resumenUSD')")
-            page.wait_for_timeout(3_000)
-            # Capture the full section including scrollable content
-            sec = page.locator("#sec-resumenUSD")
-            # Scroll into view and expand viewport to full content height
-            sec.scroll_into_view_if_needed()
-            page.wait_for_timeout(1_000)
-            # Use full page screenshot clipped to the section bounding box
-            bbox = sec.bounding_box()
-            if bbox:
-                # Add padding and ensure minimum width
-                padding = 16
-                page.screenshot(
-                    path=str(SCREENSHOT_PATH),
-                    clip={
-                        "x": max(0, bbox["x"] - padding),
-                        "y": max(0, bbox["y"] - padding),
-                        "width": bbox["width"] + padding * 2,
-                        "height": bbox["height"] + padding * 2
-                    }
-                )
-            else:
-                sec.screenshot(path=str(SCREENSHOT_PATH))
+            page.wait_for_timeout(2_000)
+            page.locator("#sec-resumenUSD").screenshot(path=str(SCREENSHOT_PATH))
         except Exception as e:
             print(f"  ⚠ Screenshot fallback: {e}")
-            page.screenshot(path=str(SCREENSHOT_PATH), full_page=True)
+            page.screenshot(path=str(SCREENSHOT_PATH))
         browser.close()
     print(f"  → Screenshot: {SCREENSHOT_PATH.stat().st_size // 1024} KB")
 
