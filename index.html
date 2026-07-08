@@ -1701,9 +1701,13 @@ function _buildResumenCharts(eChartId,_legId,cmoChartId,usdMode){
     const d=i+1; return `${_y}-${String(_m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   });
   const eMWh=r=>r?(r.h?r.h.reduce((a,b)=>a+(b||0),0):r.avg*24):null;
-  const ds=MKEYS.map((m,i)=>({label:m,data:dates.map(d=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);return eMWh(r);}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:true}));
-  const totData=dates.map(d=>{let s=0;MKEYS.forEach(m=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);if(r)s+=eMWh(r)||0;});return s;});
-  ds.push({label:'TOTAL',data:totData,borderColor:'#fff',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:2,borderDash:[4,3],spanGaps:true});
+  const ds=MKEYS.map((m,i)=>({label:m,data:dates.map(d=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);return eMWh(r);}),borderColor:CL[i],backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:1.5,spanGaps:false}));
+  const totData=dates.map(d=>{
+    const hasData=MKEYS.some(m=>getRows(EKEYS[m]).find(x=>x.fecha===d));
+    if(!hasData) return null;
+    let s=0; MKEYS.forEach(m=>{const r=getRows(EKEYS[m]).find(x=>x.fecha===d);if(r)s+=eMWh(r)||0;}); return s;
+  });
+  ds.push({label:'TOTAL',data:totData,borderColor:'#fff',backgroundColor:'transparent',fill:false,tension:0.3,pointRadius:2,borderWidth:2,borderDash:[4,3],spanGaps:false});
   mkChart(eChartId,{type:'line',data:{labels:dates.map(fmtDate),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:legendOpts,tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+Math.round(ctx.parsed.y).toLocaleString('es-AR')+' MWh'}}},scales:{x:{grid:GR,ticks:{...TK,maxRotation:45,maxTicksLimit:12}},y:{min:0,grid:GR,ticks:{...TK,callback:v=>Math.round(v).toLocaleString('es-AR')}}}}});
   const cmoR=getRows('PRECIOS-CMO');
   const cmoData=tc?cmoR.map(r=>r.avg/tc):cmoR.map(r=>r.avg);
@@ -1938,6 +1942,154 @@ function buildHowItWorks(){
   const ul=items=>`<ul style="margin:8px 0 0 18px;padding:0">${items.map(i=>`<li style="margin-bottom:6px">${i}</li>`).join('')}</ul>`;
 
   el.innerHTML=`
+    <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Guía de reconstrucción del dashboard</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px">
+      Esta sección explica el dashboard de punta a punta, como si tuvieras que construirlo de nuevo sin conocerlo.
+    </div>
+
+    ${sec('1. ¿Qué es esto y para qué sirve?', `
+      Dashboard de la <b>Central Térmica Alto Valle</b> (4 turbinas: TG23, TG22, TV11, TV12)
+      en el mercado eléctrico mayorista argentino (CAMMESA, Res. SE 400/2025).
+      Procesa la planilla PosOperativo mensual de CAMMESA (Excel, datos hora por hora) y calcula:
+      ${ul([
+        '<b>Remuneración por energía</b> (Rem. E) — CVP + renta marginal, hora por hora, máquina por máquina.',
+        '<b>Remuneración por potencia</b> (Rem. Pot) — POT_DISP × Kp × PPAD en horas HRP.',
+        '<b>Confiabilidad, RPF</b> — según planilla.',
+        '<b>Costos</b> — gas (GX y GA separado), canon de agua, ENRE, transporte, CAMMESA, impuestos.',
+        '<b>Resultado neto</b> — Rem. Total − Costos, verificable contra el DTE oficial de CAMMESA.',
+        '<b>Indisponibilidades</b> — impacto estimado de las horas i-i/lib en renta perdida.',
+        '<b>Precio SPOT</b> — precio ENER SPOT USD/MWh que pagan los Grandes Usuarios (fuente: resumen_precios_previstos.xlsx).',
+      ])}
+    `)}
+
+    ${sec('2. Arquitectura general', `
+      Todo es <b>un único archivo HTML</b> (${code('index.html')}) con JS embebido — sin backend, sin build step.
+      Vive en dos lugares:
+      ${ul([
+        `<b>Dashboard A (público)</b>: GitHub Pages — ${code('https://daniraggio.github.io/CTAVAL/')}`,
+        `<b>Dashboard B (privado)</b>: servidor interno — ${code('http://10.203.16.33/ctavav/index.html')}`,
+      ])}
+      El HTML <b>no contiene datos</b>. Al cargar, hace ${code('fetch')} de los .xls y ${code('config.json')} desde
+      ${code('raw.githubusercontent.com/daniraggio/CTAVAL/main/data/')} y los parsea en el browser con <b>SheetJS</b>.
+      <br><br>
+      Para publicar cambios se usa ${code('publisher.html')}: un archivo separado que contiene el ${code('index.html')} completo
+      embebido como string JSON. Al abrirlo, pide un <b>Personal Access Token de GitHub</b> (scope ${code('repo')})
+      y hace PUT a la API de GitHub para sobreescribir el ${code('index.html')} en el repo → GitHub Pages re-publica automáticamente.
+    `)}
+
+    ${sec('3. Pipeline automático (GitHub Actions)', `
+      Cron diario ~3AM ARG (${code('.github/workflows/update_aval.yml')}):
+      ${ul([
+        `${code('scripts/descargar_aval.py')} — hace POST a ${code('orazul.cilary.com/get_report')} para descargar el PosOperativo del mes actual
+         (y el anterior si estamos en los primeros 5 días). Guarda ${code('data/AVAL_YYYY_MM.xls')}.
+         También consulta ${code('dolarapi.com/v1/dolares/mayorista')} (TC mayorista ≈ Com.A 3500) y guarda
+         ${code('TC')} + ${code('TCDate')} en ${code('data/config.json')} para el mes actual.`,
+        `<b>Commit automático</b> — git commit + push de los .xls y config.json.`,
+        `${code('scripts/send_resumen.py')} — abre el dashboard con Playwright headless, navega al último mes con datos,
+         muestra la sección <b>Resumen (USD)</b>, toma screenshot, lo embebe como base64 en el HTML del mail y lo envía
+         por Gmail SMTP (cuenta ${code('jarvis.aconcagua@gmail.com')}, App Password en secret ${code('GMAIL_APP_PASSWORD')}).
+         Solo envía si el .xls cambió desde el último envío (hash SHA256 de filas de datos, guardado en ${code('data/.last_email_state.json')}).`,
+      ])}
+    `)}
+
+    ${sec('4. TC (tipo de cambio) — lógica de carga', `
+      El TC es crítico porque todos los valores USD dependen de él. La lógica es:
+      ${ul([
+        `<b>Meses pasados</b>: el ${code('config.json')} tiene el TC del último día hábil del mes (commitado por el workflow).
+         El dashboard lo usa siempre desde ahí, <b>nunca llama a la API</b> para meses pasados.`,
+        `<b>Mes actual</b>: usa el TC del ${code('config.json')} como base. Si ${code('TCDate')} es de hoy, no llama a la API.
+         Si es de ayer o anterior, refresca desde ${code('dolarapi.com')}.`,
+        `El TC <b>nunca se guarda en localStorage</b> — siempre viene del ${code('config.json')} o de la API.`,
+        `Si el ${code('config.json')} tiene un error de sintaxis JSON, toda la carga de TC falla silenciosamente.
+         Verificar con JSONLint si el TC no carga. El error más común: coma decimal en lugar de punto (ej: ${code('"TC": 1483,0198')}).`,
+      ])}
+    `)}
+
+    ${sec('5. Hojas clave de la planilla (por máquina: TG23, TG22, TV11, TV12)', `
+      ${ul([
+        `${code('AVALxx-ENERGIA')} — energía generada por hora (MWh). Base de todo: si E>0 esa hora "cuenta".`,
+        `${code('AVALxx-CVPCOMBREM-GX')} / ${code('-GA')} — CVP combustible $/MWh. -GX en horas GX, -GA en horas GA.`,
+        `${code('AVALxx-CVPTRANSPREMPROV-GX')} / ${code('-GA')} — CVP transporte. Solo TG23 y TG22 tienen transporte real; las TV tienen el mismo valor que su TG del ciclo (CC23=TG23+TV11, CC22=TG22+TV12).`,
+        `${code('AVALxx-CVPOYMREM-GX')} / ${code('-GA')} — CVP O&M. Las 4 máquinas.`,
+        `${code('AVALxx-FACTOR_PERDIDAS')} — factor de pérdidas FP (multiplica al CMO).`,
+        `${code('AVALxx-EST_REMUN')} — estado operativo por hora: ${code('===')} normal, ${code('COP')} costo operativo, ${code('i-i')} indisponible, ${code('lib')} sin despacho, ${code('Arr')} arranque.`,
+        `${code('cvp-AVALxx-COMB')} — declaración GX/GA por hora (determina FRC y qué planilla CVP usar).`,
+        `${code('AVALxx-POT_DISP')} — potencia disponible (MW) por hora.`,
+        `Globales: ${code('PRECIOS-CMO')} ($/MWh), ${code('PRECIOS-PPAD')} (USD/MW, solo horas HRP), ${code('RPF-PRECIO_RPF')}.`,
+      ])}
+      <b>Fallback CVP para horas i-i</b> (sin dato propio): busca en orden: (1) propio, (2) partner CC (TG23↔TV11, TG22↔TV12) hora exacta, (3) partner grupo (TG22→TG23, TV12→TV11) hora exacta, (4) promedio mensual del partner grupo, (5) promedio mensual CC partner, (6) promedio propio. Si todo es 0 → no calcula energía para esa hora.
+    `)}
+
+    ${sec('6. Fórmula central: remuneración por energía', `
+      Para <b>cada hora y cada máquina</b> con E > 0, ${code('calcRemHour(m,fecha,h)')} calcula:
+      <div style="background:var(--surface2);border-left:3px solid var(--accent);border-radius:6px;padding:14px 18px;margin:12px 0;font-family:var(--mono);font-size:12px;line-height:2">
+        CVP_TOTAL = CVP_Comb + CVP_Transp + CVP_OyM &nbsp;($/MWh)<br>
+        CMO_FP = CMO × FP<br>
+        RMIN_USD = 2 si (CVP_TOTAL/TC) &lt; 60 USD, sino 7 USD &nbsp;→&nbsp; RMIN = RMIN_USD × TC<br>
+        FRC = 1.0 si GA, 0.8 si GX<br>
+        <b>REM_hora = CVP_TOTAL + MAX(RMIN, MAX(0, CMO_FP − CVP_TOTAL) × FRA × FRC)</b><br>
+        <span style="color:var(--warn)">Excepción COP: REM_hora = CVP_TOTAL (sin renta adicional)</span><br>
+        <b>REM_total = Σ (REM_hora × E_hora)</b> para las 4 máquinas y todas las horas del mes
+      </div>
+      FRA = ${code('CFG.FRA')} (default 0.15). El CVP que se usa (-GX o -GA) depende de la declaración horaria en ${code('cvp-AVALxx-COMB')}.
+      <br><b>Validación</b>: el resultado coincide con el DTE de CAMMESA con diferencia < 0.1% en meses sin gas propio.
+    `)}
+
+    ${sec('7. Indisponibilidades — cálculo dinámico', `
+      Para cada hora con estado ${code('i-i')} o ${code('lib')}, si CMO×FP > CVP (y CVP > 0), calcula la renta perdida:
+      <div style="background:var(--surface2);border-left:3px solid var(--danger);border-radius:6px;padding:12px 16px;margin:10px 0;font-family:var(--mono);font-size:12px;line-height:2">
+        Rem_hora = CVP + MAX(RMIN; (CMO×FP − CVP) × FRA × FRC)<br>
+        Gas_hora = (CVP_Comb + CVP_Transp) × E<br>
+        <b>Renta_perdida = Rem − Gas = OyM×E + MAX(RMIN;...)×E</b>
+      </div>
+      ${ul([
+        `<b>Potencia</b>: se calcula en <b>todas</b> las horas HRP (PPAD > 0), sin filtro de CMO. Rem. Pot = POT_NOM × Kp × PPAD × TC.`,
+        `<b>POT_NOM fijo</b>: TG = 24 MW, TV = 11 MW (no varía por mes).`,
+        `<b>Total perdido</b>: Renta E + Rem. Pot.`,
+        `⚠ Sección en revisión — resultados aproximados.`,
+      ])}
+    `)}
+
+    ${sec('8. Promedio de potencia — criterio', `
+      <b>Promedio de potencia = MW·h acumulados / horas totales del mes (días × 24)</b>.
+      Incluye todas las horas en el denominador, incluso las sin despacho (cuentan como 0).
+      Esto aplica tanto al promedio por máquina como al promedio total (${code('calcPotMes()')}).
+      La suma de los promedios individuales debe coincidir con el promedio total del mes.
+    `)}
+
+    ${sec('9. Precio SPOT (Grandes Usuarios)', `
+      Fuente: ${code('data/resumen_precios_previstos.xlsx')} — hoja "Precios", columna D = fecha, columna F = ENER SPOT (USD/MWh).
+      Datos diarios desde fila 20. Se filtra por mes seleccionado.
+      El promedio mensual se muestra en el encabezado de Resumen (USD) y en la sección Precio SPOT.
+      El archivo se actualiza diariamente en el repo (descargado por el workflow de Actions).
+    `)}
+
+    ${sec('10. Configuración y persistencia (config.json)', `
+      ${ul([
+        `Parámetros globales (FRA=0.15, RMIN umbral=60, CONF, Canon, Transporte, ENRE) y por mes (TC, Kp, fechas quincenas)
+         viven en ${code('data/config.json')} en el repo.`,
+        `Al cargar: (1) se aplica localStorage (sin TC), (2) se aplica config.json del repo encima — el repo siempre gana para TC.`,
+        `El botón <b>"Guardar configuración"</b> sube el config.json actualizado al repo vía API de GitHub
+         (requiere PAT con scope ${code('repo')}, guardado en localStorage del browser).`,
+        `El TC <b>nunca</b> se guarda en localStorage. El TC de meses pasados es permanente en el config.json.`,
+      ])}
+    `)}
+
+    ${sec('11. Convenciones y nombres clave del código', `
+      ${ul([
+        `${code("MKEYS = ['TG23','TG22','TV11','TV12']")} — orden estándar en todos los loops.`,
+        `${code('CC23')} = TG23+TV11, ${code('CC22')} = TG22+TV12 — ciclos combinados.`,
+        `${code('GX')} = Gas de Acuerdo (CAMMESA) → FRC=0.8. ${code('GA')} = Gas Propio → FRC=1.`,
+        `${code('getRows(sheetKey)')} — devuelve filas de una hoja para el mes actual (${code('MONTH')}).`,
+        `${code('allDates(keys)')} — fechas presentes en una o más hojas, ordenadas.`,
+        `${code('MONTH')} — mes seleccionado, formato ${code("'YYYY_MM'")}.`,
+        `${code('TC_CACHE')} — caché de TC por mes. ${code('getTC()')} lo consulta primero, luego ${code('MONTH_CFG[MONTH].TC')}.`,
+        `${code('SPOT_DATA')} — datos de precio SPOT por mes, cargados desde resumen_precios_previstos.xlsx.`,
+        `Promedios: divisor siempre = horas totales del mes (días × 24), no horas con datos.`,
+      ])}
+    `)}
+  `;
+}
     <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Gu\u00eda de reconstrucci\u00f3n del dashboard</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:24px">
       Esta secci\u00f3n explica el dashboard de punta a punta, como si tuvieras que construirlo de nuevo sin conocerlo.
@@ -2100,6 +2252,7 @@ function buildHowItWorks(){
     `)}
   `;
 }
+
 
 function buildEnergia(){
   const horas=MKEYS.map(m=>horasOperadas(EKEYS[m]));
