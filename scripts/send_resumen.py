@@ -15,7 +15,7 @@ from playwright.sync_api import sync_playwright
 GMAIL_USER      = "jarvis.aconcagua@gmail.com"
 GMAIL_APP_PASS  = os.environ.get("GMAIL_APP_PASSWORD", "")
 FROM_EMAIL      = "jarvis.aconcagua@gmail.com"
-TO_EMAILS       = ["draggio@aconcaguaenergia.com","jspinoso@aconcaguaenergia.com","mschoua@aconcaguaenergia.com","jbasso@aconcaguaenergia.com","dtrabucco@aconcaguaenergia.com"]
+TO_EMAILS       = ["danielraggio@gmail.com", "draggio@aconcaguaenergia.com", "jspinoso@aconcaguaenergia.com"]
 
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
@@ -203,7 +203,7 @@ def current_month_xls():
 
 
 def file_hash(path):
-    """Hash solo las filas de datos del XLS (ignora metadatos como fecha de generación)."""
+    """Hash solo las filas de ENERGIA de las 4 máquinas — solo cambia cuando hay datos nuevos reales."""
     if not path.exists():
         return None
     try:
@@ -211,24 +211,29 @@ def file_hash(path):
         from datetime import datetime as dt
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
         h = hashlib.sha256()
-        # Hash the data rows of key sheets only
-        key_sheets = ['AVALTG23-ENERGIA', 'AVALTG22-ENERGIA', 'AVALTV11-ENERGIA', 'AVALTV12-ENERGIA',
-                      'PRECIOS-CMO', 'AVALTG23-CVPCOMBREM-GX', 'AVALTG22-CVPCOMBREM-GX']
-        for sheet in key_sheets:
+        # Only hash energy sheets — these change only when new generation data arrives
+        energy_sheets = [
+            'AVALTG23-ENERGIA', 'AVALTG22-ENERGIA',
+            'AVALTV11-ENERGIA', 'AVALTV12-ENERGIA'
+        ]
+        for sheet in energy_sheets:
             if sheet not in wb.sheetnames:
                 continue
             for row in wb[sheet].iter_rows(values_only=True):
-                if isinstance(row[0], dt):
-                    # Only hash date + numeric values, skip metadata rows
-                    row_str = str(row[0].date()) + '|' + '|'.join(
-                        str(round(v, 4)) if isinstance(v, float) else str(v)
-                        for v in row[2:26]
-                    )
-                    h.update(row_str.encode())
+                if not isinstance(row[0], dt):
+                    continue
+                # Hash: date + all 24 hourly values (null-aware)
+                row_str = str(row[0].date()) + '|' + '|'.join(
+                    str(round(v, 4)) if isinstance(v, float)
+                    else str(v) if v is not None
+                    else ''
+                    for v in row[2:26]
+                )
+                h.update(row_str.encode())
         wb.close()
         return h.hexdigest()
-    except Exception:
-        # Fallback to full file hash
+    except Exception as e:
+        print(f"  ⚠ Hash error: {e} — usando hash de archivo completo")
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
@@ -267,6 +272,10 @@ if __name__ == "__main__":
 
         # If state uses old hash method (no 'v' key), force resend once to recalibrate
         state_hash = state.get("hash") if state.get("v") == 2 else None
+
+        print(f"  → XLS: {xls_path.name}")
+        print(f"  → Hash actual:  {current_hash[:16] if current_hash else 'N/A'}...")
+        print(f"  → Hash guardado: {state_hash[:16] if state_hash else 'N/A (fuerza envío)'}...")
 
         if current_hash and state_hash == current_hash:
             print(f"  ℹ️  Sin novedades en {xls_path.name} desde el último mail — no se envía.")
