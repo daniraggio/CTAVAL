@@ -22,7 +22,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install requests playwright
+          pip install requests playwright openpyxl
           playwright install chromium
 
       - name: Ejecutar script de descarga
