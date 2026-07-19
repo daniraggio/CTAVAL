@@ -2043,10 +2043,11 @@ function buildHowItWorks(){
         <b>Renta_perdida = Rem − Gas = OyM×E + MAX(RMIN;...)×E</b>
       </div>
       ${ul([
-        `<b>Potencia</b>: se calcula en <b>todas</b> las horas HRP (PPAD > 0), sin filtro de CMO. Rem. Pot = POT_NOM × Kp × PPAD × TC.`,
+        `<b>FRC real por hora</b>: FRC=1 si la hora (propia, o la máquina usada como sustituto de CVP) es Gas Propio (GA); FRC=0.8 si es Gas de Acuerdo (GX) — igual criterio que la remuneración real (${code('calcRemHour')}).`,
+        `<b>Potencia</b>: se calcula en <b>todas</b> las horas HRP (PPAD > 0), sin filtro de CMO. Rem. Pot = MAX(0; POT_NOM − POT_DISP_real) × Kp × PPAD × TC — se descuenta el POT_DISP real para no duplicar la potencia ya remunerada en horas 'lib' (disponible, sin despacho de energía).`,
         `<b>POT_NOM fijo</b>: TG = 24 MW, TV = 11 MW (no varía por mes).`,
         `<b>Total perdido</b>: Renta E + Rem. Pot.`,
-        `⚠ Sección en revisión — resultados aproximados.`,
+        `⚠ Sección en revisión — resultados aproximados. Además, la renta unitaria (USD/MWh) de esta sección no es directamente comparable con la renta unitaria real de energía: acá solo se promedian las horas i-i/lib donde CMO×FP&gt;CVP (un subconjunto de horas distinto al de generación real), y el CVP de esas horas suele ser estimado (partner o promedio mensual), no medido.`,
       ])}
     `)}
 
@@ -2318,44 +2319,59 @@ function buildIndisp(){
     return (r.h?r.h[h]:null)??r.avg??0;
   }
 
+  // Tipo de gas por hora (GA=propio FRC=1, GX=acuerdo FRC=0.8) — misma lógica que calcRemHour/calcCostoGas
+  function tipoAt(src,d,h){
+    const ctR=getRows(COMBTYPEKEYS[src]).find(x=>x.fecha===d);
+    return ctR?.h?String(ctR.h[h]||'').trim()==='GA':false;
+  }
+  function cvpAt(src,d,h){
+    const isGA=tipoAt(src,d,h);
+    const c=gv(isGA?COMBKEYS_GA[src]:COMBKEYS[src],d,h);
+    const t=gv(isGA?TRANSPKEYS_GA[src]:TRANSPKEYS[src],d,h);
+    const o=gv(isGA?OYMKEYS_GA[src]:OYMKEYS[src],d,h);
+    return {c,t,o,isGA};
+  }
+
   function getCVP2(m,d,h){
-    const c=gv(COMBKEYS[m],d,h), t=gv(TRANSPKEYS[m],d,h), o=gv(OYMKEYS[m],d,h);
-    if(c+t+o>0) return {c,t,o};
+    const own=cvpAt(m,d,h);
+    if(own.c+own.t+own.o>0) return own;
     // CC partner (TG23↔TV11, TG22↔TV12)
     const cp=CC[m];
-    const cc=gv(COMBKEYS[cp],d,h), ct=gv(TRANSPKEYS[cp],d,h), co=gv(OYMKEYS[cp],d,h);
-    if(cc+ct+co>0) return {c:cc,t:ct,o:co};
+    const cc=cvpAt(cp,d,h);
+    if(cc.c+cc.t+cc.o>0) return cc;
     // Group partner (TG23↔TG22, TV11↔TV12) — use hourly first, then monthly avg
     for(const gp of (GRP[m]||[])){
-      const gc=gv(COMBKEYS[gp],d,h), gt=gv(TRANSPKEYS[gp],d,h), go=gv(OYMKEYS[gp],d,h);
-      if(gc+gt+go>0) return {c:gc,t:gt,o:go};
+      const gc=cvpAt(gp,d,h);
+      if(gc.c+gc.t+gc.o>0) return gc;
       // If no hourly data, use monthly avg of the group partner
       const pa=PROXY[gp];
-      if(pa&&(pa.c+pa.t+pa.o)>0) return {c:pa.c,t:pa.t,o:pa.o};
+      if(pa&&(pa.c+pa.t+pa.o)>0) return pa;
     }
     // CC partner monthly avg
     const cpa=PROXY[cp];
-    if(cpa&&(cpa.c+cpa.t+cpa.o)>0) return {c:cpa.c,t:cpa.t,o:cpa.o};
+    if(cpa&&(cpa.c+cpa.t+cpa.o)>0) return cpa;
     // Own monthly avg
     const pa=PROXY[m];
-    if(pa&&(pa.c+pa.t+pa.o)>0) return {c:pa.c,t:pa.t,o:pa.o};
+    if(pa&&(pa.c+pa.t+pa.o)>0) return pa;
     return null;
   }
 
-  // Monthly avg CVP proxy (from operational hours)
+  // Monthly avg CVP proxy (from operational hours) — respeta tipo de gas GA/GX por hora
   function avgCVP(m){
-    let sc=0,st=0,so=0,n=0;
+    let sc=0,st=0,so=0,n=0,gaHs=0;
     getRows(EKEYS[m]).forEach(er=>{
       const eh=er.h||Array(24).fill(er.avg||0);
       for(let h=0;h<24;h++){
         const e=eh[h]||0; if(!e) continue;
-        sc+=gv(COMBKEYS[m],er.fecha,h);
-        st+=gv(TRANSPKEYS[m],er.fecha,h);
-        so+=gv(OYMKEYS[m],er.fecha,h);
+        const isGA=tipoAt(m,er.fecha,h);
+        sc+=gv(isGA?COMBKEYS_GA[m]:COMBKEYS[m],er.fecha,h);
+        st+=gv(isGA?TRANSPKEYS_GA[m]:TRANSPKEYS[m],er.fecha,h);
+        so+=gv(isGA?OYMKEYS_GA[m]:OYMKEYS[m],er.fecha,h);
+        if(isGA) gaHs++;
         n++;
       }
     });
-    return n>0?{c:sc/n,t:st/n,o:so/n}:{c:0,t:0,o:0};
+    return n>0?{c:sc/n,t:st/n,o:so/n,isGA:gaHs>n/2}:{c:0,t:0,o:0,isGA:false};
   }
 
   function getPotNom(m){
@@ -2387,7 +2403,8 @@ function buildIndisp(){
         acc[m].hs++;
         let cvpD=getCVP2(m,fecha,h);
         if(!cvpD) cvpD=PROXY[m];
-        const {c,t,o}=cvpD; const cvp=c+t+o;
+        const {c,t,o,isGA}=cvpD; const cvp=c+t+o;
+        const FRC=isGA?1:0.8;  // Gas Propio (GA) → FRC=1, Gas de Acuerdo (GX) → FRC=0.8 (igual que calcRemHour)
         // Energy: only if CMO*FP > CVP
         if(cmo*fp>cvp && cvp>0 && potNom[m]>0){
           acc[m].hsCmo++;
@@ -2396,13 +2413,17 @@ function buildIndisp(){
           // Rem = (CVP + MAX(RMIN; (CMO×FP−CVP)×FRA×FRC)) × E
           // Gas = (Comb+Transp) × E
           // Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E
-          const renta_marg=Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*0.8);
+          const renta_marg=Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*FRC);
           const renta=o*e + renta_marg*e;  // OyM×E + renta_marginal×E
           acc[m].e+=e; acc[m].renta+=renta;
         }
-        // Potencia: all HRP hours
+        // Potencia: todas las horas HRP, pero descontando lo que ya se remuneró realmente (POT_DISP)
+        // para no duplicar en horas 'lib' donde la máquina ya estuvo disponible y cobró potencia real.
         if(ppad>0 && potNom[m]>0){
-          acc[m].mwhrp+=potNom[m]; acc[m].remPot+=potNom[m]*kp*ppad*tc;
+          const potDispRow=getRows(POTKEYS[m]).find(x=>x.fecha===fecha);
+          const potDispReal=(potDispRow?.h?potDispRow.h[h]:null)??potDispRow?.avg??0;
+          const gapPot=Math.max(0,potNom[m]-(potDispReal||0));
+          acc[m].mwhrp+=gapPot; acc[m].remPot+=gapPot*kp*ppad*tc;
         }
       });
     }
@@ -2410,10 +2431,10 @@ function buildIndisp(){
 
   const METODOLOGIA=`<div style="background:var(--surface2);border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Metodología del cálculo</div>
-    <b>Renta perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP (y CVP &gt; 0): Rem = (CVP + MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)) × E · Gas = (Comb+Transp) × E · Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E. Si no hay CVP disponible (máquina sin datos en el mes) no se calcula energía.<br>
+    <b>Renta perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP (y CVP &gt; 0): Rem = (CVP + MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)) × E · Gas = (Comb+Transp) × E · Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E. FRC=1 si el tipo de gas de la hora (o de la fuente usada como sustituto) es Gas Propio (GA), FRC=0.8 si es Gas de Acuerdo (GX) — igual que en la remuneración real. Si no hay CVP disponible (máquina sin datos en el mes) no se calcula energía.<br>
     <b>Potencia nominal:</b> TG = 24 MW · TV = 11 MW (fijo).<br>
     <b>CVP en horas i-i:</b> (1) hoja propia · (2) partner CC (TG23↔TV11, TG22↔TV12) · (3) grupo · (4) promedio mensual proxy.<br>
-    <b>Potencia:</b> Rem. Pot. = POT_NOM × KP × PPAD × TC en todas las horas HRP (PPAD&gt;0).<br>
+    <b>Potencia:</b> Rem. Pot. = MAX(0; POT_NOM − POT_DISP_real) × KP × PPAD × TC en todas las horas HRP (PPAD&gt;0). Se descuenta el POT_DISP real para no duplicar en horas 'lib' (donde la máquina ya estuvo disponible y cobró potencia real).<br>
     <b>Total perdido:</b> Renta marginal E + Rem. Pot.
   </div>`;
 
