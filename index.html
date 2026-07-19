@@ -2036,18 +2036,19 @@ function buildHowItWorks(){
     `)}
 
     ${sec('7. Indisponibilidades — cálculo dinámico', `
-      Para cada hora con estado ${code('i-i')} o ${code('lib')}, si CMO×FP > CVP (y CVP > 0), calcula la renta perdida:
+      Para cada hora con estado ${code('i-i')} o ${code('lib')}: si el gemelo de tipo (TG23↔TG22, TV11↔TV12) está despachado esa hora, se copia su tratamiento real completo. Si no, se usa el método de respaldo (si CMO×FP > CVP y CVP > 0):
       <div style="background:var(--surface2);border-left:3px solid var(--danger);border-radius:6px;padding:12px 16px;margin:10px 0;font-family:var(--mono);font-size:12px;line-height:2">
         Rem_hora = CVP + MAX(RMIN; (CMO×FP − CVP) × FRA × FRC)<br>
         Gas_hora = (CVP_Comb + CVP_Transp) × E<br>
         <b>Renta_perdida = Rem − Gas = OyM×E + MAX(RMIN;...)×E</b>
       </div>
       ${ul([
-        `<b>FRC real por hora</b>: FRC=1 si la hora (propia, o la máquina usada como sustituto de CVP) es Gas Propio (GA); FRC=0.8 si es Gas de Acuerdo (GX) — igual criterio que la remuneración real (${code('calcRemHour')}).`,
-        `<b>Potencia</b>: se calcula en <b>todas</b> las horas HRP (PPAD > 0), sin filtro de CMO. Rem. Pot = MAX(0; POT_NOM − POT_DISP_real) × Kp × PPAD × TC — se descuenta el POT_DISP real para no duplicar la potencia ya remunerada en horas 'lib' (disponible, sin despacho de energía).`,
-        `<b>POT_NOM fijo</b>: TG = 24 MW, TV = 11 MW (no varía por mes).`,
+        `<b>Copia del gemelo de tipo</b>: si TG23/TG22 (o TV11/TV12) está despachado esa hora, se usa exactamente su E, su CVP, su estado (===/COP/CMB) y su fórmula real (${code('calcRemHour')}) para la máquina caída — en vez de asumir potencia nominal fija con el filtro CMO×FP>CVP. Solo se cae al método de respaldo cuando el gemelo de tipo también está i-i/lib (o sin dato) esa misma hora.`,
+        `<b>FRC real por hora</b>: FRC=1 si la hora (propia, del gemelo copiado, o de la máquina usada como sustituto de CVP) es Gas Propio (GA); FRC=0.8 si es Gas de Acuerdo (GX) — igual criterio que la remuneración real (${code('calcRemHour')}).`,
+        `<b>Potencia</b>: se calcula en <b>todas</b> las horas HRP (PPAD > 0), sin filtro de CMO. Rem. Pot = MAX(0; CAP_ASUMIDA − POT_DISP_real) × Kp × PPAD × TC. CAP_ASUMIDA es el POT_DISP real del gemelo de tipo si ese gemelo está despachado esa hora; si tampoco lo está, se usa POT_NOM fijo. Se descuenta el POT_DISP real propio para no duplicar la potencia ya remunerada en horas 'lib' (disponible, sin despacho de energía).`,
+        `<b>POT_NOM fijo</b>: TG = 24 MW, TV = 11 MW (no varía por mes, usado solo cuando no hay gemelo despachado para copiar).`,
         `<b>Total perdido</b>: Renta E + Rem. Pot.`,
-        `⚠ Sección en revisión — resultados aproximados. Además, la renta unitaria (USD/MWh) de esta sección no es directamente comparable con la renta unitaria real de energía: acá solo se promedian las horas i-i/lib donde CMO×FP&gt;CVP (un subconjunto de horas distinto al de generación real), y el CVP de esas horas suele ser estimado (partner o promedio mensual), no medido.`,
+        `⚠ Sección en revisión — resultados aproximados. La calidad de la copia del gemelo depende de cuánto se "turnen" en el tiempo TG23/TG22 y TV11/TV12: si ambos caen indisponibles a la vez, esas horas quedan sin gemelo real para copiar y caen al método de respaldo, con sus limitaciones conocidas (CVP estimado, filtro CMO×FP>CVP, sin equivalente al estado COP).`,
       ])}
     `)}
 
@@ -2401,28 +2402,75 @@ function buildIndisp(){
         const fpRow=getRows(FPKEYS[m]).find(x=>x.fecha===fecha);
         const fp=(fpRow?.h?fpRow.h[h]:null)??fpRow?.avg??1;
         acc[m].hs++;
-        let cvpD=getCVP2(m,fecha,h);
-        if(!cvpD) cvpD=PROXY[m];
-        const {c,t,o,isGA}=cvpD; const cvp=c+t+o;
-        const FRC=isGA?1:0.8;  // Gas Propio (GA) → FRC=1, Gas de Acuerdo (GX) → FRC=0.8 (igual que calcRemHour)
-        // Energy: only if CMO*FP > CVP
-        if(cmo*fp>cvp && cvp>0 && potNom[m]>0){
-          acc[m].hsCmo++;
-          const e=potNom[m];
-          const rmin=(cvp/tc<RMIN_THR?RMIN_LO:RMIN_HI)*tc;
-          // Rem = (CVP + MAX(RMIN; (CMO×FP−CVP)×FRA×FRC)) × E
-          // Gas = (Comb+Transp) × E
-          // Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E
-          const renta_marg=Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*FRC);
-          const renta=o*e + renta_marg*e;  // OyM×E + renta_marginal×E
-          acc[m].e+=e; acc[m].renta+=renta;
+        // Energy: si el gemelo de tipo (TG23↔TG22, TV11↔TV12) está despachado esa hora, se copia
+        // su tratamiento real completo (mismo E, mismo CVP, mismo estado ===/COP/CMB, misma fórmula
+        // que calcRemHour). Si el gemelo también está i-i/lib (o sin dato), sigue el método actual:
+        // sustitución de CVP en cascada + filtro CMO×FP>CVP.
+        const gpE=GRP[m]?.[0];
+        const estGpRow=gpE?getRows(ESTKEYS[gpE]).find(x=>x.fecha===fecha):null;
+        const estGp=(estGpRow?.h?estGpRow.h[h]:null)??'';
+        const gpDespachado=estGp!=='i-i'&&estGp!=='lib'&&estGp!=='';
+        let copiado=false;
+        if(gpDespachado){
+          const eGpRow=getRows(EKEYS[gpE]).find(x=>x.fecha===fecha);
+          const eGp=(eGpRow?.h?eGpRow.h[h]:null)??eGpRow?.avg??0;
+          if(eGp>0){
+            const ctRow=getRows(COMBTYPEKEYS[gpE]).find(x=>x.fecha===fecha);
+            const isGAgp=ctRow?.h?String(ctRow.h[h]||'').trim()==='GA':false;
+            const combKeyGp=isGAgp?COMBKEYS_GA[gpE]:COMBKEYS[gpE];
+            const transpKeyGp=isGAgp?TRANSPKEYS_GA[gpE]:TRANSPKEYS[gpE];
+            const oymKeyGp=isGAgp?OYMKEYS_GA[gpE]:OYMKEYS[gpE];
+            const cGp=getRows(combKeyGp).find(x=>x.fecha===fecha);
+            const cValGp=(cGp?.h?cGp.h[h]:null)??cGp?.avg??0;
+            const tGp=getRows(transpKeyGp).find(x=>x.fecha===fecha);
+            const tValGp=(tGp?.h?tGp.h[h]:null)??tGp?.avg??0;
+            const oGp=getRows(oymKeyGp).find(x=>x.fecha===fecha);
+            const oValGp=(oGp?.h?oGp.h[h]:null)??oGp?.avg??0;
+            const cvpGp=cValGp+tValGp+oValGp;
+            const fpGpRow=getRows(FPKEYS[gpE]).find(x=>x.fecha===fecha);
+            const fpGp=(fpGpRow?.h?fpGpRow.h[h]:null)??fpGpRow?.avg??1;
+            const isCOPgp=(estGp==='COP');
+            const RMINgp=(cvpGp/tc<RMIN_THR?RMIN_LO:RMIN_HI)*tc;
+            const FRCgp=isGAgp?1:0.8;
+            const diffGp=Math.max(0,cmo*fpGp-cvpGp);
+            const remGp=isCOPgp?cvpGp:(cvpGp+Math.max(RMINgp,diffGp*FRA*FRCgp));
+            const gasGp=cValGp+tValGp;
+            const rentaGp=(remGp-gasGp)*eGp;
+            acc[m].e+=eGp; acc[m].renta+=rentaGp;
+            if(!isCOPgp && cmo*fpGp>cvpGp) acc[m].hsCmo++;
+            copiado=true;
+          }
         }
-        // Potencia: todas las horas HRP, pero descontando lo que ya se remuneró realmente (POT_DISP)
-        // para no duplicar en horas 'lib' donde la máquina ya estuvo disponible y cobró potencia real.
+        if(!copiado){
+          let cvpD=getCVP2(m,fecha,h);
+          if(!cvpD) cvpD=PROXY[m];
+          const {c,t,o,isGA}=cvpD; const cvp=c+t+o;
+          const FRC=isGA?1:0.8;  // Gas Propio (GA) → FRC=1, Gas de Acuerdo (GX) → FRC=0.8 (igual que calcRemHour)
+          // Energy: only if CMO*FP > CVP
+          if(cmo*fp>cvp && cvp>0 && potNom[m]>0){
+            acc[m].hsCmo++;
+            const e=potNom[m];
+            const rmin=(cvp/tc<RMIN_THR?RMIN_LO:RMIN_HI)*tc;
+            // Rem = (CVP + MAX(RMIN; (CMO×FP−CVP)×FRA×FRC)) × E
+            // Gas = (Comb+Transp) × E
+            // Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E
+            const renta_marg=Math.max(rmin,Math.max(0,cmo*fp-cvp)*FRA*FRC);
+            const renta=o*e + renta_marg*e;  // OyM×E + renta_marginal×E
+            acc[m].e+=e; acc[m].renta+=renta;
+          }
+        }
+        // Potencia: todas las horas HRP. Capacidad asumida = POT_DISP real del "gemelo de tipo"
+        // (TG23↔TG22, TV11↔TV12) si ese gemelo está despachado esa hora; si el gemelo tampoco
+        // está despachado, se usa la potencia nominal fija (24/11 MW). Siempre se descuenta el
+        // POT_DISP real propio para no duplicar en horas 'lib' (ya remuneradas de verdad).
         if(ppad>0 && potNom[m]>0){
           const potDispRow=getRows(POTKEYS[m]).find(x=>x.fecha===fecha);
           const potDispReal=(potDispRow?.h?potDispRow.h[h]:null)??potDispRow?.avg??0;
-          const gapPot=Math.max(0,potNom[m]-(potDispReal||0));
+          const gp=GRP[m]?.[0];
+          const potDispGpRow=gp?getRows(POTKEYS[gp]).find(x=>x.fecha===fecha):null;
+          const potDispGp=(potDispGpRow?.h?potDispGpRow.h[h]:null)??potDispGpRow?.avg??0;
+          const capacidadAsumida=(potDispGp&&potDispGp>0)?potDispGp:potNom[m];
+          const gapPot=Math.max(0,capacidadAsumida-(potDispReal||0));
           acc[m].mwhrp+=gapPot; acc[m].remPot+=gapPot*kp*ppad*tc;
         }
       });
@@ -2431,10 +2479,10 @@ function buildIndisp(){
 
   const METODOLOGIA=`<div style="background:var(--surface2);border:1px solid rgba(79,142,247,.25);border-radius:10px;padding:16px 20px;margin-bottom:20px;font-size:12px;color:var(--muted);line-height:1.7">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">Metodología del cálculo</div>
-    <b>Renta perdida:</b> En horas i-i/lib donde CMO×FP &gt; CVP (y CVP &gt; 0): Rem = (CVP + MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)) × E · Gas = (Comb+Transp) × E · Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E. FRC=1 si el tipo de gas de la hora (o de la fuente usada como sustituto) es Gas Propio (GA), FRC=0.8 si es Gas de Acuerdo (GX) — igual que en la remuneración real. Si no hay CVP disponible (máquina sin datos en el mes) no se calcula energía.<br>
+    <b>Renta perdida:</b> En horas i-i/lib con CVP &gt; 0: si el gemelo de tipo (TG23↔TG22, TV11↔TV12) está despachado esa hora, se copia su tratamiento real completo (mismo E, CVP, estado ===/COP/CMB y fórmula que la remuneración real). Si el gemelo también está i-i/lib, se usa el método de respaldo: Rem = (CVP + MAX(RMIN ; (CMO×FP−CVP)×FRA×FRC)) × E, con E = POT_NOM, solo si CMO×FP&gt;CVP (y CVP&gt;0) · Gas = (Comb+Transp) × E · Renta = Rem − Gas = OyM×E + MAX(RMIN;...)×E. FRC=1 si el tipo de gas de la hora (propia o del gemelo/sustituto usado) es Gas Propio (GA), FRC=0.8 si es Gas de Acuerdo (GX) — igual que en la remuneración real. Si no hay CVP disponible (máquina sin datos en el mes) no se calcula energía.<br>
     <b>Potencia nominal:</b> TG = 24 MW · TV = 11 MW (fijo).<br>
     <b>CVP en horas i-i:</b> (1) hoja propia · (2) partner CC (TG23↔TV11, TG22↔TV12) · (3) grupo · (4) promedio mensual proxy.<br>
-    <b>Potencia:</b> Rem. Pot. = MAX(0; POT_NOM − POT_DISP_real) × KP × PPAD × TC en todas las horas HRP (PPAD&gt;0). Se descuenta el POT_DISP real para no duplicar en horas 'lib' (donde la máquina ya estuvo disponible y cobró potencia real).<br>
+    <b>Potencia:</b> Rem. Pot. = MAX(0; CAP_ASUMIDA − POT_DISP_real) × KP × PPAD × TC en todas las horas HRP (PPAD&gt;0). CAP_ASUMIDA = POT_DISP real del gemelo de tipo (TG23↔TG22, TV11↔TV12) si está despachado esa hora; si tampoco lo está, POT_NOM fijo (24/11 MW). Se descuenta el POT_DISP real propio para no duplicar en horas 'lib' (donde la máquina ya estuvo disponible y cobró potencia real).<br>
     <b>Total perdido:</b> Renta marginal E + Rem. Pot.
   </div>`;
 
