@@ -141,9 +141,11 @@ def build_html_email():
     mes = MESES[now.month-1]
     fecha_str = now.strftime("%d/%m/%Y %H:%M")
 
-    # Embed screenshot as base64 so the email is self-contained
-    img_b64 = base64.b64encode(SCREENSHOT_PATH.read_bytes()).decode()
-    img_tag = f'<img src="data:image/png;base64,{img_b64}" width="640" style="width:100%;border-radius:6px;display:block" alt="Resumen del mes"/>'
+    # Use the hosted GitHub URL instead of base64 — Gmail/Google Workspace
+    # strips data: URIs from received HTML mail, leaving the section blank.
+    # Cache-bust with a timestamp so clients don't show a stale cached image.
+    img_url = f"{IMG_PUBLIC_URL}?t={int(now.timestamp())}"
+    img_tag = f'<img src="{img_url}" width="640" style="width:100%;border-radius:6px;display:block" alt="Resumen del mes"/>'
 
     html = f"""<!DOCTYPE html>
 <html>
