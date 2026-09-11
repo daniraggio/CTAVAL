@@ -179,6 +179,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Ciclo abierto (solo TG)</div>
         <div id="tbl-resumen-ca" style="display:inline-block"></div>
       </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Factor de Despacho</div>
+        <div id="tbl-resumen-fd" style="display:inline-block"></div>
+      </div>
     </div>
     <div class="card" style="margin-bottom:18px">
       <div class="card-hdr"><div><div class="card-title">Energía diaria por activo</div><div class="card-sub">MWh — acumulado diario</div></div></div>
@@ -216,6 +220,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);font-size:14
       <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Ciclo abierto (solo TG)</div>
         <div id="tbl-resumenUSD-ca" style="display:inline-block"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;border-left:1px solid var(--border);padding-left:32px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">Factor de Despacho</div>
+        <div id="tbl-resumenUSD-fd" style="display:inline-block"></div>
       </div>
     </div>
     <div class="card" style="margin-bottom:18px">
@@ -1217,6 +1225,22 @@ function calcPotMes(){
   return horasTotales?totalSum/horasTotales:0;
 }
 
+// Potencia total de Alto Valle (uso interno, no se muestra en la UI):
+// suma de las potencias nominales de las máquinas de AV = 2×TG (25 MW c/u) + 2×TV (15 MW c/u)
+// = 50 MW + 30 MW = 80 MW
+const POT_AV_TOTAL_MW=80;
+
+// Factor de Despacho = Energía generada por toda la central / (POT_AV_TOTAL_MW × horas del mes)
+// "Horas del mes" = (cantidad de días con datos) × 24 — se recalcula solo con los días
+// efectivamente cargados, así que es retroactivo y se actualiza solo al agregar más datos.
+function calcFactorDespacho(){
+  const dias=allDates(Object.values(EKEYS)).length;
+  const horasMes=dias*24;
+  const {eMWh}=getComputedTotals();
+  const factor=horasMes>0?eMWh.TOTAL/(POT_AV_TOTAL_MW*horasMes):0;
+  return {factor,dias,horasMes,energia:eMWh.TOTAL};
+}
+
 // Costo Gas = (CVP_Comb_h + CVP_Transp_h) * Energia_h por máquina y hora
 function calcCostoGas(){
   // Returns {TOTAL (GX only, matches DTE), TOTAL_GA (gas propio), byMaq}
@@ -1689,6 +1713,17 @@ async function buildResumen(){
   const fmtMWh=v=>v>0?`<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--teal)">${Math.round(v).toLocaleString('es-AR')}</span><span style="font-size:11px;color:var(--muted);margin-left:4px">MWh</span>`:'<span style="font-size:13px;color:var(--muted)">Sin datos</span>';
   document.getElementById('tbl-resumen-cc').innerHTML=fmtMWh(eMWh_CC);
   document.getElementById('tbl-resumen-ca').innerHTML=fmtMWh(eMWh_CA);
+
+  // Factor de Despacho
+  const fdEl=document.getElementById('tbl-resumen-fd');
+  if(fdEl){
+    const fd=calcFactorDespacho();
+    fdEl.innerHTML=fd.dias>0
+      ? `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--purple)">${(fd.factor*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})}%</span>`+
+        `<span style="font-size:11px;color:var(--muted);margin-left:8px">${fd.dias} día${fd.dias!==1?'s':''} · ${fd.horasMes.toLocaleString('es-AR')} h</span>`
+      : `<span style="font-size:13px;color:var(--muted)">Sin datos</span>`;
+  }
+
   _buildResumenCharts('cEnergiaRes',null,null);
 }
 
@@ -1923,6 +1958,16 @@ function _renderResumenUSD(){
   const caElUSD=document.getElementById('tbl-resumenUSD-ca');
   if(ccElUSD) ccElUSD.innerHTML=fmtMWh2(eMWh_CC2);
   if(caElUSD) caElUSD.innerHTML=fmtMWh2(eMWh_CA2);
+
+  // Factor de Despacho (mismo valor que en Resumen $, no depende de TC)
+  const fdElUSD=document.getElementById('tbl-resumenUSD-fd');
+  if(fdElUSD){
+    const fd=calcFactorDespacho();
+    fdElUSD.innerHTML=fd.dias>0
+      ? `<span style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--purple)">${(fd.factor*100).toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})}%</span>`+
+        `<span style="font-size:11px;color:var(--muted);margin-left:8px">${fd.dias} día${fd.dias!==1?'s':''} · ${fd.horasMes.toLocaleString('es-AR')} h</span>`
+      : `<span style="font-size:13px;color:var(--muted)">Sin datos</span>`;
+  }
 
   _buildResumenCharts('cEnergiaResUSD',null,null,true);
 }
