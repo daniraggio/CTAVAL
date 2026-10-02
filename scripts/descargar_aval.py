@@ -114,12 +114,6 @@ def fetch_tc_bcra(year, month):
     return None, None
 
 
-# Kp por defecto según el mes (igual que MONTH_KP_DEFAULTS de index.html):
-# dic-feb y jun-ago = 1.1, resto = 0.9
-KP_POR_MES = {1: 1.1, 2: 1.1, 3: 0.9, 4: 0.9, 5: 0.9, 6: 1.1,
-              7: 1.1, 8: 1.1, 9: 0.9, 10: 0.9, 11: 0.9, 12: 1.1}
-
-
 def _prev_month(year, month):
     return (year - 1, 12) if month == 1 else (year, month - 1)
 
@@ -162,14 +156,11 @@ def update_config_tc(meses):
     for year, month in todos:
         mk = f"{year}_{month:02d}"
         es_actual = (year, month) == cur
-        existe = mk in month_cfg
         if not es_actual and tc_valido(mk):
             continue  # mes pasado con TC cargado: no se toca
 
         tc, tc_date = fetch_tc_bcra(year, month)
         entry = month_cfg.setdefault(mk, {})
-        if not existe:
-            entry.setdefault("KP", KP_POR_MES[month])
         if tc:
             entry.update({"TC": tc, "TCDate": tc_date})
             entry.pop("TCFallback", None)
