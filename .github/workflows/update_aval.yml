@@ -37,9 +37,13 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Actions Bot"
-          git add -f data/AVAL_*.xls
-          git diff --staged --quiet || git commit -m "🤖 Auto-update planillas AVAL $(date +'%Y-%m-%d')"
+          git add -f data/AVAL_*.xls data/config.json
+          git diff --staged --quiet || git commit -m "🤖 Auto-update planillas AVAL + TC $(date +'%Y-%m-%d')"
+          git pull --rebase origin main || true
           git push
+
+      - name: Esperar publicación de GitHub Pages
+        run: sleep 90
 
       - name: Enviar resumen por mail
         env:
