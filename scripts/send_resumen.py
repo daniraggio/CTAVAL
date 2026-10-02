@@ -2,9 +2,11 @@
 send_resumen.py
 Toma screenshot del dashboard, lo sube a GitHub y manda el mail via Gmail SMTP.
 Ruta en el repo: scripts/send_resumen.py
+TO_EMAILS       = ["draggio@aconcaguaenergia.com", "jbasso@aconcaguaenergia.com", "dtrabucco@aconcaguaenergia.com", "evidal@aconcaguaenergia.com"]
+
 """
 
-import os, base64, requests, json, smtplib, hashlib
+import os, time, base64, requests, json, smtplib, hashlib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
@@ -15,7 +17,7 @@ from playwright.sync_api import sync_playwright
 GMAIL_USER      = "jarvis.aconcagua@gmail.com"
 GMAIL_APP_PASS  = os.environ.get("GMAIL_APP_PASSWORD", "")
 FROM_EMAIL      = "jarvis.aconcagua@gmail.com"
-TO_EMAILS       = ["draggio@aconcaguaenergia.com", "jbasso@aconcaguaenergia.com", "dtrabucco@aconcaguaenergia.com", "evidal@aconcaguaenergia.com"]
+TO_EMAILS       = ["draggio@aconcaguaenergia.com"]
 
 GH_TOKEN        = os.environ.get("GITHUB_TOKEN", "")
 REPO            = "daniraggio/CTAVAL"
@@ -32,12 +34,14 @@ MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
 
 
 def take_screenshot():
+    """Toma el screenshot y devuelve la key del mes mostrado (ej. '2026_09')."""
+    last_month_with_data = None
     print("  → Abriendo dashboard...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         # Wide viewport, very tall to avoid clipping
         page = browser.new_page(viewport={"width": 1280, "height": 5000})
-        page.goto(DASHBOARD_URL, timeout=60_000)
+        page.goto(f"{DASHBOARD_URL}?t={int(time.time())}", timeout=60_000)
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(12_000)
         try:
@@ -106,7 +110,8 @@ def take_screenshot():
             print(f"  ⚠ Screenshot error: {e}")
             page.screenshot(path=str(SCREENSHOT_PATH))
         browser.close()
-    print(f"  → Screenshot: {SCREENSHOT_PATH.stat().st_size // 1024} KB")
+    print(f"  → Screenshot: {SCREENSHOT_PATH.stat().st_size // 1024} KB (mes: {last_month_with_data})")
+    return last_month_with_data
 
 
 def upload_screenshot_to_github():
@@ -136,9 +141,24 @@ def upload_screenshot_to_github():
     print(f"  → Imagen disponible en: {IMG_PUBLIC_URL}")
 
 
-def build_html_email():
+def _parse_month_key(month_key, now):
+    """'2026_09' -> (2026, 9). Si no es válida, usa el mes actual."""
+    try:
+        y, m = month_key.split("_")
+        y, m = int(y), int(m)
+        if 1 <= m <= 12:
+            return y, m
+    except Exception:
+        pass
+    return now.year, now.month
+
+
+def build_html_email(month_key=None):
     now = datetime.now(ARG_TZ)
-    mes = MESES[now.month-1]
+    # El título refleja el mes de los DATOS mostrados, no el mes de hoy
+    data_year, data_month = _parse_month_key(month_key, now)
+    mes = MESES[data_month-1]
+    mes_hoy = MESES[now.month-1]
     fecha_str = now.strftime("%d/%m/%Y %H:%M")
 
     # Use the hosted GitHub URL instead of base64 — Gmail/Google Workspace
@@ -157,7 +177,7 @@ def build_html_email():
       <div style="font-size:14px;color:#8b949e;margin-top:4px">Actualización diaria — {fecha_str}</div>
     </div>
     <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:20px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Resumen — {mes} {now.year}</div>
+      <div style="font-size:13px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Resumen — {mes} {data_year}</div>
       {img_tag}
     </div>
     <div style="text-align:center;margin:28px 0">
@@ -171,7 +191,9 @@ def build_html_email():
   </div>
 </body>
 </html>"""
-    subject = f"Reporte Central Térmica Alto Valle — {now.day} de {mes} {now.year}"
+    subject = f"Reporte Central Térmica Alto Valle — {now.day} de {mes_hoy} {now.year}"
+    if (data_year, data_month) != (now.year, now.month):
+        subject += f" (datos de {mes} {data_year})"
     return html, subject
 
 
@@ -282,9 +304,9 @@ if __name__ == "__main__":
         if current_hash and state_hash == current_hash:
             print(f"  ℹ️  Sin novedades en {xls_path.name} desde el último mail — no se envía.")
         else:
-            take_screenshot()
+            month_key = take_screenshot()
             upload_screenshot_to_github()
-            html, subject = build_html_email()
+            html, subject = build_html_email(month_key)
             print(f"  → Enviando a: {', '.join(TO_EMAILS)}")
             send_email(html, subject)
             if current_hash:

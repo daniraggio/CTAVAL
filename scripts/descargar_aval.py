@@ -114,20 +114,73 @@ def fetch_tc_bcra(year, month):
     return None, None
 
 
+def _prev_month(year, month):
+    return (year - 1, 12) if month == 1 else (year, month - 1)
+
+
 def update_config_tc(meses):
-    """Actualiza TC en config.json para cada mes."""
+    """Actualiza TC en config.json.
+
+    Reglas:
+    - Mes actual: se actualiza siempre con el valor del día.
+    - Mes pasado: solo se completa si NO tiene TC (nunca se pisa un TC ya cargado).
+    - El mes anterior al actual se revisa siempre, aunque ya pasaron los días de solape.
+    - Si la API falla y el mes no tiene TC, se usa el último TC válido conocido
+      (marcado con TCFallback=true) para que el reporte nunca muestre TC = 0.
+    """
     cfg = {}
     if CONFIG_PATH.exists():
-        try: cfg = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
-        except: pass
+        try:
+            cfg = json.loads(CONFIG_PATH.read_text(encoding='utf-8'))
+        except Exception as e:
+            print(f"     ⚠ config.json ilegible ({e}) — no se modifica")
+            return
     month_cfg = cfg.setdefault("MONTH_CFG", {})
+
+    hoy = date.today()
+    cur = (hoy.year, hoy.month)
+    todos = list(dict.fromkeys(list(meses) + [_prev_month(*cur)]))
+    todos.sort()
+
+    def tc_valido(mk):
+        v = month_cfg.get(mk, {}).get("TC", 0)
+        return v if isinstance(v, (int, float)) and v > 0 else 0
+
+    def ultimo_tc_conocido(antes_de):
+        for mk in sorted(month_cfg.keys(), reverse=True):
+            if mk < antes_de and tc_valido(mk):
+                return month_cfg[mk]["TC"], month_cfg[mk].get("TCDate", "")
+        return None, None
+
+    def kp_previo(antes_de):
+        for mk in sorted(month_cfg.keys(), reverse=True):
+            if mk < antes_de and "KP" in month_cfg[mk]:
+                return month_cfg[mk]["KP"]
+        return 0.9
+
     updated = False
-    for year, month in meses:
+    for year, month in todos:
+        mk = f"{year}_{month:02d}"
+        es_actual = (year, month) == cur
+        existe = mk in month_cfg
+        if not es_actual and tc_valido(mk):
+            continue  # mes pasado con TC cargado: no se toca
+
         tc, tc_date = fetch_tc_bcra(year, month)
+        entry = month_cfg.setdefault(mk, {})
+        if not existe:
+            entry.setdefault("KP", kp_previo(mk))
         if tc:
-            mk = f"{year}_{month:02d}"
-            month_cfg.setdefault(mk, {}).update({"TC": tc, "TCDate": tc_date})
+            entry.update({"TC": tc, "TCDate": tc_date})
+            entry.pop("TCFallback", None)
             updated = True
+        elif not tc_valido(mk):
+            tc_prev, date_prev = ultimo_tc_conocido(mk)
+            if tc_prev:
+                entry.update({"TC": tc_prev, "TCDate": date_prev or "", "TCFallback": True})
+                print(f"     ⚠ {mk}: API sin respuesta, uso último TC conocido {tc_prev}")
+                updated = True
+
     if updated:
         CONFIG_PATH.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding='utf-8')
         print("     ✅ config.json actualizado con TC Com.3500")
@@ -148,11 +201,24 @@ def descargar_planillas():
         "X-Requested-With": "XMLHttpRequest",
     })
 
+    errores = []
     for year, month in meses:
-        descargar_mes(session, year, month)
+        try:
+            descargar_mes(session, year, month)
+        except Exception as e:
+            print(f"     ❌ {year}/{month:02d}: {e}")
+            errores.append(e)
 
+    # El TC se actualiza SIEMPRE, aunque falle alguna descarga
+    try:
+        update_config_tc(meses)
+    except Exception as e:
+        print(f"     ❌ Error actualizando TC: {e}")
+        errores.append(e)
+
+    if errores:
+        raise RuntimeError(f"{len(errores)} error(es) en la corrida")
     print(f"\n✅ Descarga completada ({len(meses)} archivo/s)")
-    update_config_tc(meses)
 
 
 if __name__ == "__main__":
