@@ -3452,18 +3452,20 @@ function buildEstOperativo(){
 
     monthDates2.forEach(fecha=>{
       const r=estRows.find(x=>x.fecha===fecha);
-      const hrs=r?.h||Array(24).fill(r?'===':null);
-      // Only show row if machine has any activity (not all null/lib)
-      const hasActivity=hrs.some(v=>v&&v!=='lib'&&v!==null);
-      if(!hasActivity) return; // skip fully-lib days
+      const hrsRaw=r?.h||Array(24).fill(r?'===':null);
+      // Siempre 24 celdas por día; se muestran TODOS los días del mes,
+      // aunque la máquina no haya sido despachada o no haya dato (celda vacía)
+      const hrs=Array.from({length:24},(_,i)=>hrsRaw[i]??null);
       hourlyHtml+=`<tr>
         <td style="padding:3px 8px;color:var(--muted);white-space:nowrap;font-size:10px">${fmtDate(fecha)}</td>`;
       hrs.forEach(v=>{
-        const s=String(v||'lib').trim();
-        const bg=STATE_BG[s]||'rgba(100,100,100,0.1)';
+        const vacia=(v===null||v===undefined||String(v).trim()==='');
+        const s=vacia?'lib':String(v).trim();
+        const bg=vacia?'rgba(100,100,100,0.08)':(STATE_BG[s]||'rgba(100,100,100,0.1)');
         const col=STATE_COLORS[s]||'var(--muted)';
         const label=s==='lib'?'':s==='==='?'OK':s;
-        hourlyHtml+=`<td title="${s}" style="padding:2px 3px;text-align:center;background:${bg};border:1px solid var(--border2)">
+        const tip=vacia?'sin estado / sin despacho':s;
+        hourlyHtml+=`<td title="${tip}" style="padding:2px 3px;min-width:26px;height:20px;text-align:center;background:${bg};border:1px solid var(--border2)">
           <span style="font-size:9px;font-weight:600;color:${col}">${label}</span>
         </td>`;
       });
