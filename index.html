@@ -853,7 +853,7 @@ function getTC(){
 }
 
 function getTCDate(){
-  return TC_CACHE[MONTH]?.date||null;
+  return TC_CACHE[MONTH]?.date||MONTH_CFG[MONTH]?.TCDate||null;
 }
 
 async function ensureTC(){
@@ -867,8 +867,8 @@ async function ensureTC(){
 
   // Past month: config.json is the source of truth — never call API
   if(MONTH !== curKey){
-    if(cfgTC && cfgTC>0) TC_CACHE[MONTH]={tc:cfgTC, date:cfgDate||null};
-    return;
+    if(cfgTC && cfgTC>0){ TC_CACHE[MONTH]={tc:cfgTC, date:cfgDate||null}; return; }
+    // Mes pasado SIN TC en config.json: no dejar el TC en 0, cae al fetch de abajo
   }
 
   // Current month: use config TC as base
@@ -879,7 +879,7 @@ async function ensureTC(){
     if(cfgDate && cfgDate>=today) return;
   }
 
-  // Fetch live TC from dolarapi.com for current month
+  // Fetch live TC from dolarapi.com (mes actual, o mes pasado sin TC cargado)
   try {
     const r=await fetch('https://dolarapi.com/v1/dolares/mayorista');
     if(r.ok){
